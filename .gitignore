@@ -1,0 +1,17 @@
+# Model files - too large for git, and everyone downloads their own anyway
+models/
+*.gguf
+
+# Personal data - your own conversations and uploaded documents
+chats/
+documents/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS junk
+.DS_Store
+Thumbs.db

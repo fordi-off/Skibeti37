@@ -1,0 +1,251 @@
+
+======================================================================
+MODELL: Qwen2.5-1.5B  (CPU)
+======================================================================
+Lastetid: 2.17s
+
+  --- [Enkelt faktaspørsmål] ---
+  Tid: 3.30s | Tokens: 10 | Hastighet: 3.03 tok/s
+
+  [SVAR]
+  Hovedstaden i Norge er Oslo.
+
+  --- [Kort forklaring] ---
+  Tid: 30.39s | Tokens: 400 | Hastighet: 13.16 tok/s
+
+  [SVAR]
+  Fotosyntese er et vital proces på mange formene av liv. Det er en metode for å producere energi til å bruke på å leve. Her er en forklaring på fotosyntese på 150 ord:
+
+Fotosyntese er en kompleks prosess som krever stjullen, sol, air og water. Hvorbei stjullen synes å ha en energioppbyggelig reaktie som er kjent som fotoreaktionsprosessen.
+
+Grunnen til fotosyntese er at stjullen krever energi og er ikke produktiv om man ikke har stjullen. Stjullen har en enkeltstruktur som gir et biljett for å ha en energioppbyggelig reaktie. 
+
+Hvis stjullen ikke har en stjullen, vil solen være en anden grunn til fotosyntese. Solen har en struktur som gir en energioppbyggelig reaktie. 
+
+Stjullen har en reaktie som gir energi, og solen har en reaktie som gir energi. Dette energi kan brukes til å leve, og det er solen som er hovedgrunn til fotosyntese.
+
+Stjullen har en struktur som gir en energioppbyggelig reaktie, og solen har en reaktie som gir energi. Dette energi kan brukes til å leve, og det er solen som er hovedgrunn til fotosyntese.
+
+Stjullen har en reaktie som gir energi, og solen har en reaktie som gir energi. Dette energi kan brukes til å leve, og det er solen som er hovedgrunn til fotosyntese.
+
+Stjullen har
+
+  --- [Logikk/resonnering] ---
+  Tid: 7.92s | Tokens: 92 | Hastighet: 11.62 tok/s
+
+  [SVAR]
+  Vi skal bruke det opprinnelige antallet av sauer, som er 17, og minus de som dør, som er 9. 
+
+1. Vi skriver opp: 17 - 9 = 8
+2. Det er dersom 8 sauer er resten til antallet, da det ikke er noen sauer som dør.
+
+Svar: Han har igjen 8 sauer.
+
+  --- [Enkel kode (forklart på norsk)] ---
+  Tid: 27.04s | Tokens: 384 | Hastighet: 14.20 tok/s
+
+  [SVAR]
+  En funksjon som sjekker om et tall er et primtall kan følge følgende sykkel:
+
+```python
+def er_primtall(n):
+    # Primtall er større enn 1 og har bare 2 og deres mellomrom som dele.
+    if n < 2:
+        return False
+    for i in range(2, n // 2 + 1):
+        if n % i == 0:
+            return False
+    return True
+
+# Test funksjonen
+print(er_primtall(7))  # returnerer True
+print(er_primtall(8))  # returnerer False
+```
+
+Denne funksjonen fungerer på følgende måte:
+
+1. **Kontroller om tallet er mindre enn 2**: Primtall må være mindre enn 2. Dette returnerer `False` for alle tall under 2.
+
+2. **For-loop**: For hver tallet mellom 2 og tallet dividede med 2 plus 1, sjekker om det er et dele av tallet. Dette gjør at primtall må være stortere enn 1 og bare ha 2 og deres mellomrom som dele.
+
+3. **Returnererer True**: Hvis det ikke har noen dele mellom 2 og tallet dividede med 2 plus 1, returnerer funksjonen `True`.
+
+4. **Returnererer False**: Hvis det har noen dele mellom 2 og tallet dividede med 2 plus 1, returnerer funksjonen `False`.
+
+Denne funksjonen er en brudd på "prime number" i engelsk, som har betegnelse "primtall" i norsk.
+
+======================================================================
+MODELL: Qwen2.5-7B  (CPU)
+======================================================================
+Lastetid: 4.42s
+
+  --- [Enkelt faktaspørsmål] ---
+  Tid: 10.47s | Tokens: 10 | Hastighet: 0.96 tok/s
+
+  [SVAR]
+  Hovedstaden i Norge er Oslo.
+
+  --- [Kort forklaring] ---
+  Tid: 85.51s | Tokens: 269 | Hastighet: 3.15 tok/s
+
+  [SVAR]
+  Fotosyntese er en kjemiske reaksjon som verdiarbeider solstråler, vann og koolstoffer og konverterer dem til organisert energi i form av glukose. Procesen starter med solen, som gir energi til bladet i plantene via kloroplastene. I kloroplastene forekommer to faser: lystreaksjonene og hjelpsmiddelfase.
+
+I lystreaksjonene, som skjer i kjlaveter, brukes solens lys til å konvertere vann til oksygen og hydrider. Disse hydrider danner deler av ATP og NADPH, som er energimidler. I hjelpsmiddelfase, som skjer i kjlakortet, brukes ATP og NADPH til å konvertere koolstoffer (C02) fra luften til glukose. Dette prosessen, kjent som kalværksreaksjonen, bygger på karmen og er kjennetegnet av et kompleks nätverk av kemiske reaksjoner som genererer glukose, som er et viktig energisilde for plantene.
+
+  --- [Logikk/resonnering] ---
+  Tid: 64.61s | Tokens: 192 | Hastighet: 2.97 tok/s
+
+  [SVAR]
+  For å løse denne oppgaven, la oss gå gjennom den trinn for trinn.
+
+1. Bonde starter med 17 sauer.
+2. Vi vet at alle sauer dør unna, med unntak av 9 sauer.
+3. Dermed, hvis vi truer 8 sauer fra den totale antallet, vil vi ha den antallet sauer som er igjen.
+
+Vi kan beregne dette ved å trekke 8 fra 17:
+
+17 - 8 = 9
+
+Så bonde har 9 sauer igjen.
+
+Forklaring: Vi trekker 8 sauer fra den totale antallet (17) fordi 9 sauer dør, og vi vil ikke ta dem med i beregningen. Da er vi vennlig til å beholde 9 sauer, som ikke dør.
+
+  --- [Enkel kode (forklart på norsk)] ---
+  Tid: 191.42s | Tokens: 636 | Hastighet: 3.32 tok/s
+
+  [SVAR]
+  Sikkert! Her er en enkel Python-funksjon som sjekker om et tall er et primtall, og så forklarings av hvordan den fungerer:
+
+```python
+def er_primtall(n):
+    # Sjekk om tall er mindre enn 2, som ikke er primtall
+    if n <= 1:
+        return False
+    # Sjekk om tall er 2, som er det eneste partall som er primtall
+    if n == 2:
+        return True
+    # Sjekk om tall er et oddetall, siden bare 2 er et partall som er primtall
+    if n % 2 == 0:
+        return False
+    # Sjekk om tallet har noen faktorer mindre enn det, utelukkende 1 og det tallet selv
+    for i in range(3, int(n**0.5) + 1, 2):
+        if n % i == 0:
+            return False
+    return True
+```
+
+### Forklaring av funksjonen:
+
+1. **`if n <= 1:`** - Hvis tallet er mindre enn eller lik 1, så er det ikke et primtall, så vi returnerer `False`.
+
+2. **`if n == 2:`** - 2 er det eneste partall som er et primtall, så hvis tallet er 2, returnerer vi `True`.
+
+3. **`if n % 2 == 0:`** - Om tallet er et partall (utelukkende 2) og ikke 2, så er det ikke et primtall, så vi returnerer `False`.
+
+4. **For-løkke fra 3 til `int(n**0.5) + 1, steg med 2**:** - Her sjekker vi om tallet har noen faktorer mindre enn det tallet selv, men kun for oddetall (siden vi allerede har sjekket partall). Vi begynner fra 3 og går opp til kvadratroten av tallet (plusser 1 for å inkludere det) for å optimere koden, fordi hvis tallet har en faktor større enn kvadratroten, må det også ha en faktor mindre enn kvadratroten.
+
+5. **`if n % i == 0:`** - Hvis tallet er delelig med noen av disse verdien, så er det ikke et primtall, så vi returnerer `False`.
+
+6. **`return True`** - Hvis vi har gjennomført alle disse sjekkene uten å finne noen faktorer, så er tallet et primtall, og vi returnerer `True`.
+
+Denne metoden er effektiv for de fleste primtall, men kan bli litt langsom for very store tall.
+
+======================================================================
+MODELL: DeepSeek-R1-7B  (CPU)
+======================================================================
+Lastetid: 4.50s
+
+  --- [Enkelt faktaspørsmål] ---
+  Tid: 13.49s | Tokens: 26 | Hastighet: 1.93 tok/s
+
+  [TENKING]
+  Hovedstaden i Norge er Trondheim.
+
+  [SVAR]
+  Hovedstaden i Norge er Trondheim.
+
+  --- [Kort forklaring] ---
+  Tid: 140.08s | Tokens: 400 | Hastighet: 2.86 tok/s
+
+  [TENKING]
+  Fotosyntese er en biofunktion som hent store energi av solstråling foran en blåbær, medan de underveis i en grønn miljø. Denne prosessen skjer i blåbærens plast under den ene celledelene. For at det kan skjeve, må de direkte stråling av solstråling i nærheten til blåbären til å ha minst 12,500 langsom per kg, som er 80 % av den totale stråleksposur den har under hele tiden de er i solstråling. De to grunnleggende faser som er involveret er C4-C5 og C7.
+
+C4-C5 faseret er en type av faser som hent energi av solstråling og transformerer den til frukst, hvilket er en energi til cellene. C7 faseret er en type av faser som tar fruksten til cellene og transformerer den til frukst for de neste faserene. C7 faserene er også annerledes etableret for at de kan gi den muligheten til C4-C5 faseren til hent store energi av solstråling.
+
+Til slutt, kan man si at fotosyntese er en veldig spredende prosess som har stor influe over naturen. De har været en grunn til at høyrer har været tilfinne forårsaket av solstråling. De har været en grunn til at blåbærene har vært en viktig del av den grøne miljøen som er oppholdt av de blåbærøyne.
+
+  [SVAR]
+  Fotosyntese er en
+
+  --- [Logikk/resonnering] ---
+  Tid: 94.25s | Tokens: 252 | Hastighet: 2.67 tok/s
+
+  [TENKING]
+  Første, kan vi forstå at bonden har 17 sauer totalt.
+
+Detter, søker vi etter sauer som ikke er i dør. Vi vite at bonden har 9 dør. Hvis hvert dør har 1 sauer, vil det være 9 sauer i dør.
+
+Så kan vi trekke 9 sauer fra det totale antall sauer for at oss kan finne ut hvor mange sauer bonden har igjen.
+
+17 sauer - 9 sauer = 8 sauer igjen.
+
+  [SVAR]
+  Bon med deg med min matematiske hjelp.
+
+Bon har 17 sauer totalt. Vi vet at alle sauer som ikke er i dør er igjen. Bon har 9 dør, og hvert dør har 1 sauer. Dermed er der 9 sauer i dør. Vi kan trekke disse sauer fra det totale antall sauer for å finne ut hvor mange sauer bon har igjen.
+
+17 sauer - 9 sauer = 8 sauer igjen.
+
+Bon har igjen 8 sauer.
+
+  --- [Enkel kode (forklart på norsk)] ---
+  Tid: 281.23s | Tokens: 800 | Hastighet: 2.84 tok/s
+
+  [SVAR]
+  <think>
+Forårsøk: Hei, jeg skal hjelpe deg med å forklare en Python-funksjon som sjekker om et tall er et primtall. Primtall er tall som kun er divisør med 1 og seg selv, som du har skrevet i svar nr. 3. Men forårsøk, jeg søker etter en effektiv måte å overveise om en funksjon som kan gjøre det. Jeg er i tvil om hvorfor du søker etter en annen måte enn å test divisører. Men forårsøk, du er i tvil, så kan du forøye deg og levere en annen måte. Men, jeg tror du kan forbedre seg av en annen måte. Forårsøk, jeg søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte.
+
+Dette er en nyttig oppføring av den opprinnelige svarnr. Den er underforstårlig, men kan forbedres forbedring av en annen måte. Forårsøk, du kan forbedre seg av en annen måte. Men, jeg søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte.
+
+Forårsøk, jeg søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte. Men, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte.
+
+Forårsøk, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte. Men, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte.
+
+Forårsøk, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte. Men, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte.
+
+Forårsøk, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte. Men, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen måte. Men, jeg tror du kan forbedre seg av en annen måte.
+
+Forårsøk, du søker etter en annen måte. Men, du er i tvil, så kan du forbedre seg av en annen må
+
+
+======================================================================
+SAMLET OPPSUMMERING - HASTIGHET
+======================================================================
+Modell             Last (s)     Snitt tok/s    
+---------------------------------------------
+Qwen2.5-1.5B       2.17         10.50          
+Qwen2.5-7B         4.42         2.60           
+DeepSeek-R1-7B     4.50         2.58           
+
+======================================================================
+DETALJERT PER OPPGAVE
+======================================================================
+
+Qwen2.5-1.5B:
+  Enkelt faktaspørsmål           3.30s | 3.03 tok/s
+  Kort forklaring                30.39s | 13.16 tok/s
+  Logikk/resonnering             7.92s | 11.62 tok/s
+  Enkel kode (forklart på norsk) 27.04s | 14.20 tok/s
+
+Qwen2.5-7B:
+  Enkelt faktaspørsmål           10.47s | 0.96 tok/s
+  Kort forklaring                85.51s | 3.15 tok/s
+  Logikk/resonnering             64.61s | 2.97 tok/s
+  Enkel kode (forklart på norsk) 191.42s | 3.32 tok/s
+
+DeepSeek-R1-7B:
+  Enkelt faktaspørsmål           13.49s | 1.93 tok/s
+  Kort forklaring                140.08s | 2.86 tok/s
+  Logikk/resonnering             94.25s | 2.67 tok/s
+  Enkel kode (forklart på norsk) 281.23s | 2.84 tok/s
