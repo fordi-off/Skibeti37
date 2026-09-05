@@ -45,7 +45,6 @@ your-folder/
 │   api.py                  ← the Api class exposed to JavaScript
 │   app.py                  ← entry point (defines main())
 │   Skibeti37.pyw            ← double-click launcher, windowless (calls app.main)
-│   make-shortcut.py         ← run once to create a desktop/parent-folder shortcut
 │   config.py                ← settings, model file discovery
 │   config.json               ← your saved settings (git-ignored, auto-created from defaults)
 │   chats.py                  ← chat CRUD, context building, compression
@@ -154,26 +153,40 @@ model, merge the shards into one file first with llama.cpp's
 
 ## Running the app
 
-Any of:
+Either:
 
 - **Double-click `Skibeti37.pyw`** — runs through `pythonw.exe`, so no
   console window. A `.pyw` file is not blocked by the script-execution
   policies that stop `.bat`/`.cmd` on locked-down (e.g. school) Windows
   machines.
 - **`python app.py`** from a terminal.
-- **A desktop shortcut.** Run `python make-shortcut.py` once on each
-  machine — it drops `Skibeti37.lnk` in the folder above the project and
-  on the Desktop, pointing back here. Move it wherever you like (e.g.
-  keep the project folder and the shortcut side by side on the Desktop).
-  If your machine blocks that too, right-click `Skibeti37.pyw` →
-  *Send to* → *Desktop (create shortcut)*.
 
 `app.py` switches to its own folder on startup, so it works no matter
-which directory it is launched from — no "Start in" field to configure.
+which directory it is launched from.
 
 The window opens already maximized, with normal borders and title bar
 (you can resize or un-maximize it like any other window). Models load
 only when actually used (lazy loading), so startup is fast.
+
+### Making a desktop shortcut
+
+Windows shortcuts store an absolute path, so there's no portable one to
+ship — make your own on each machine (about 15 seconds):
+
+1. Open the project folder.
+2. Right-click **`Skibeti37.pyw`** → **Send to** → **Desktop (create
+   shortcut)**.
+   (On Windows 11, "Send to" is under **Show more options**.)
+3. The new shortcut on your Desktop can be renamed and moved anywhere on
+   that machine — it keeps pointing back to the project folder.
+
+If you'd rather point it at Python directly: right-click the Desktop →
+**New** → **Shortcut**, use `pythonw "C:\full\path\to\Skibeti37\app.py"`
+as the location, then open the shortcut's **Properties** and set
+**Start in** to `C:\full\path\to\Skibeti37`.
+
+Don't move or rename the project folder afterwards — that breaks the
+shortcut. If you do, just make a new one.
 
 ---
 
