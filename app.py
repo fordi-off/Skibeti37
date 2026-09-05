@@ -1,7 +1,7 @@
 """
 Skibeti37 - local chat app with saved conversations, a document library and skills.
 
-Run with: python app.py
+Run with: python app.py  (or double-click Skibeti37.pyw for a windowless launch)
 Requires: pip install pywebview llama-cpp-python numpy
 
 The actual logic lives in dedicated modules:
@@ -29,9 +29,9 @@ import runtime
 import skills
 from api import Api
 
-skills.seed_default_skills()
 
-if __name__ == "__main__":
+def main():
+    skills.seed_default_skills()
     api = Api()
     window = webview.create_window(
         "Skibeti37",
@@ -42,3 +42,7 @@ if __name__ == "__main__":
     window.events.shown += window.maximize
     runtime.window = window
     webview.start()
+
+
+if __name__ == "__main__":
+    main()

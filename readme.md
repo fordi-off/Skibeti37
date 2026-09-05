@@ -43,7 +43,9 @@ server to start manually.
 ```
 your-folder/
 │   api.py                  ← the Api class exposed to JavaScript
-│   app.py                  ← entry point - run this
+│   app.py                  ← entry point (defines main())
+│   Skibeti37.pyw            ← double-click launcher, windowless (calls app.main)
+│   make-shortcut.py         ← run once to create a desktop/parent-folder shortcut
 │   config.py                ← settings, model file discovery
 │   config.json               ← your saved settings (git-ignored, auto-created from defaults)
 │   chats.py                  ← chat CRUD, context building, compression
@@ -152,14 +154,22 @@ model, merge the shards into one file first with llama.cpp's
 
 ## Running the app
 
-```bash
-python app.py
-```
+Any of:
 
-or double-click `start.bat` (runs it windowless via `pythonw`). `app.py`
-switches to its own folder on startup, so it also works from a desktop
-shortcut or from any other directory — no need to set the shortcut's
-"Start in" field.
+- **Double-click `Skibeti37.pyw`** — runs through `pythonw.exe`, so no
+  console window. A `.pyw` file is not blocked by the script-execution
+  policies that stop `.bat`/`.cmd` on locked-down (e.g. school) Windows
+  machines.
+- **`python app.py`** from a terminal.
+- **A desktop shortcut.** Run `python make-shortcut.py` once on each
+  machine — it drops `Skibeti37.lnk` in the folder above the project and
+  on the Desktop, pointing back here. Move it wherever you like (e.g.
+  keep the project folder and the shortcut side by side on the Desktop).
+  If your machine blocks that too, right-click `Skibeti37.pyw` →
+  *Send to* → *Desktop (create shortcut)*.
+
+`app.py` switches to its own folder on startup, so it works no matter
+which directory it is launched from — no "Start in" field to configure.
 
 The window opens already maximized, with normal borders and title bar
 (you can resize or un-maximize it like any other window). Models load
