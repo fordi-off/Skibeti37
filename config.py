@@ -1,5 +1,6 @@
-"""Innstillinger og modell-oppdagelse. config.json lagrer visningsnavn,
-aktiv-status og CPU/GPU-valg per modellfil, samt kontekstvindu og tråd-antall."""
+"""Settings and model discovery. config.json stores the display name,
+active status and CPU/GPU choice per model file, plus the context window
+and thread count."""
 
 import json
 import os
@@ -33,6 +34,8 @@ def save_config(cfg):
 
 
 def humanize_filename(fname):
+    """Turn a file name into a readable label: drop the extension, replace
+    "_"/"-" with spaces and capitalise the first letter."""
     stem = os.path.splitext(fname)[0].replace("_", " ").replace("-", " ").strip()
     return (stem[:1].upper() + stem[1:]) if stem else fname
 
@@ -48,8 +51,8 @@ def scan_model_files():
 
 
 def get_models_config():
-    """Slår sammen filene som faktisk finnes i models/-mappen med lagrede
-    innstillinger fra config.json. Nye filer får fornuftige standardverdier."""
+    """Merge the files actually present in models/ with the saved settings
+    from config.json. New files get sensible defaults."""
     cfg = load_config()
     files = scan_model_files()
     models_cfg = cfg.get("models", {})
@@ -76,9 +79,9 @@ def get_models_config():
 
 
 def get_utility_model_filename():
-    """Modellen brukt til bakgrunnsoppgaver (dokument-oppsummering,
-    samtale-komprimering): eksplisitt valgt modell hvis satt, ellers den
-    minste aktive modellfilen."""
+    """The model used for background tasks (document summaries, conversation
+    compression): the explicitly chosen model if set, otherwise the smallest
+    active model file."""
     cfg = load_config()
     models_cfg = get_models_config()
     forced = cfg.get("utility_model")

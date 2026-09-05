@@ -1,6 +1,6 @@
-"""Api-klassen som pywebview eksponerer til JavaScript (window.pywebview.api.*).
-Selve logikken bor i de andre modulene - denne klassen er bare en tynn
-kobling mellom JS-kall og Python-funksjonene."""
+"""The Api class that pywebview exposes to JavaScript (window.pywebview.api.*).
+The actual logic lives in the other modules - this class is just a thin link
+between JS calls and the Python functions."""
 
 import json
 
@@ -13,7 +13,7 @@ import skills
 
 
 class Api:
-    # ---------------- Modeller ----------------
+    # ---------------- Models ----------------
 
     def list_models(self):
         models_cfg = config.get_models_config()
@@ -62,7 +62,7 @@ class Api:
         model_manager.reset_embedder()
         return {"n_threads": cfg["n_threads"]}
 
-    # ---------------- Samtaler ----------------
+    # ---------------- Conversations ----------------
 
     def list_chats(self):
         return chats.list_chats()
@@ -70,8 +70,8 @@ class Api:
     def load_chat(self, chat_id):
         return chats.load_chat(chat_id)
 
-    def save_chat(self, chat_id, name, model_name, messages_json, language="no"):
-        return chats.save_chat(chat_id, name, model_name, json.loads(messages_json), language)
+    def save_chat(self, chat_id, name, model_name, messages_json):
+        return chats.save_chat(chat_id, name, model_name, json.loads(messages_json))
 
     def rename_chat(self, chat_id, new_name):
         return chats.rename_chat(chat_id, new_name)
@@ -79,7 +79,7 @@ class Api:
     def delete_chat(self, chat_id):
         return chats.delete_chat(chat_id)
 
-    # ---------------- Dokumenter ----------------
+    # ---------------- Documents ----------------
 
     def list_documents(self, chat_id):
         return documents.list_documents(chat_id)
@@ -122,7 +122,7 @@ class Api:
     def delete_skill(self, skill_id):
         return skills.delete_skill(skill_id)
 
-    # ---------------- Kontekst og generering ----------------
+    # ---------------- Context and generation ----------------
 
     def estimate_context(self, chat_id, model_name, messages_json):
         try:
@@ -135,3 +135,6 @@ class Api:
 
     def continue_message(self, model_name, messages_json, chat_id=None):
         return generation.continue_message(model_name, json.loads(messages_json), chat_id)
+
+    def stop_generation(self):
+        return generation.stop()

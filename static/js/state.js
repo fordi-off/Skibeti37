@@ -1,38 +1,28 @@
 marked.setOptions({ breaks: true, gfm: true });
 
 let allModels = [];          // [{id, name}]
-let modelLabels = {};        // id -> name (kort visningstekst)
+let modelLabels = {};        // id -> name (short display text)
 let currentModel = null;
 let currentChatId = null;
 let currentChatName = null;
-let currentLanguage = "no";
-let conversation = [{ role: "system", content: systemPromptFor("no") }];
 let isGenerating = false;
 
-function systemPromptFor(lang) {
-  if (lang === "en") {
-    return "You are a helpful assistant. Always answer in English, regardless of what language the question is asked in. Think step by step when needed.";
-  }
-  return "Du er en hjelpsom assistent. Svar alltid på norsk, uansett hvilket språk spørsmålet er stilt på. Tenk steg for steg når det trengs.";
-}
+const SYSTEM_PROMPT =
+  "You are a helpful assistant. Always reply in the same language the user " +
+  "writes in, and match their tone. Think step by step when a question needs it.";
 
-function setLanguage(lang) {
-  currentLanguage = lang;
-  conversation[0] = { role: "system", content: systemPromptFor(lang) };
-  document.querySelectorAll(".lang-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.lang === lang);
-  });
-}
+let conversation = [{ role: "system", content: SYSTEM_PROMPT }];
 
-document.querySelectorAll(".lang-btn").forEach(btn => {
-  btn.onclick = async () => {
-    setLanguage(btn.dataset.lang);
-    if (currentChatId) await persistChat();
-  };
-});
+// Reasoning models (DeepSeek-R1 distill) emit a <think> block that the UI
+// renders separately from the answer.
+function isReasoningModel(id) {
+  if (!id) return false;
+  return id.toLowerCase().includes("deepseek")
+    || (modelLabels[id] || "").toLowerCase().includes("deepseek");
+}
 
 const chatEl = document.getElementById("chat");
-const pickerEl = document.getElementById("model-picker");
+const modelSelectEl = document.getElementById("model-select");
 const statusEl = document.getElementById("status-line");
 const formEl = document.getElementById("input-form");
 const inputEl = document.getElementById("input-field");
@@ -75,3 +65,32 @@ function repairMarkdownTables(text) {
 function formatInline(text) {
   return marked.parse(repairMarkdownTables(text || ""));
 }
+
+// ---------------- Confirm dialog ----------------
+// confirmDialog(message) -> Promise<boolean>. Used before anything that
+// deletes messages (regenerate / edit further up a conversation).
+
+const confirmOverlayEl = document.getElementById("confirm-overlay");
+const confirmTextEl = document.getElementById("confirm-text");
+let _confirmResolve = null;
+
+function confirmDialog(message) {
+  confirmTextEl.textContent = message;
+  confirmOverlayEl.classList.remove("hidden");
+  document.getElementById("confirm-ok-btn").focus();
+  return new Promise(resolve => { _confirmResolve = resolve; });
+}
+
+function _closeConfirm(result) {
+  confirmOverlayEl.classList.add("hidden");
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+
+document.getElementById("confirm-ok-btn").onclick = () => _closeConfirm(true);
+document.getElementById("confirm-cancel-btn").onclick = () => _closeConfirm(false);
+confirmOverlayEl.addEventListener("click", (e) => {
+  if (e.target === confirmOverlayEl) _closeConfirm(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (!confirmOverlayEl.classList.contains("hidden") && e.key === "Escape") _closeConfirm(false);
+});

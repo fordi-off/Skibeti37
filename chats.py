@@ -1,7 +1,8 @@
-"""Samtale-CRUD, og selve kontekstbyggingen: slår sammen system-prompt,
-aktive skills, dokumentkontekst (RAG) og en eventuelt komprimert
-samtalehistorikk til meldingene som faktisk sendes til modellen."""
+"""Conversation CRUD, and the context building itself: merges the system
+prompt, active skills, document context (RAG) and an optionally compressed
+conversation history into the messages actually sent to the model."""
 
+import os
 import time
 import uuid
 
@@ -11,11 +12,17 @@ import documents
 import model_manager
 import skills
 
-RECENT_KEEP_MESSAGES = 10  # antall siste meldinger som alltid sendes ordrett
+RECENT_KEEP_MESSAGES = 10  # number of most recent messages always sent verbatim
+
+# Framing text injected into the system prompt ahead of the rolling summary.
+SUMMARY_PREFIX = (
+    "Summary of earlier parts of this conversation (older messages are "
+    "compressed to save space, but the user still has the full history "
+    "saved). Keep replying in the language the user is using:\n"
+)
 
 
 def list_chats():
-    import os
     chats = []
     for fname in os.listdir(chat_store.CHATS_DIR):
         if not fname.endswith(".json") or fname.startswith("_"):
@@ -37,7 +44,7 @@ def load_chat(chat_id):
     return chat_store.load_chat_raw(chat_id)
 
 
-def save_chat(chat_id, name, model_name, messages, language="no"):
+def save_chat(chat_id, name, model_name, messages):
     if not chat_id:
         chat_id = str(uuid.uuid4())
     existing = chat_store.load_chat_raw(chat_id) or {}
@@ -45,7 +52,6 @@ def save_chat(chat_id, name, model_name, messages, language="no"):
         "id": chat_id,
         "name": name,
         "model": model_name,
-        "language": language,
         "messages": messages,
         "attached_docs": existing.get("attached_docs", {}),
         "updated_at": time.time(),
@@ -64,7 +70,6 @@ def rename_chat(chat_id, new_name):
 
 
 def delete_chat(chat_id):
-    import os
     path = chat_store.chat_path(chat_id)
     if os.path.exists(path):
         os.remove(path)
@@ -81,6 +86,34 @@ def count_tokens(llm, messages):
     return total
 
 
+def _summary_prompt(existing_summary, new_chunk):
+    """Build the utility-model prompt that folds new messages into the
+    running summary. The instruction is in English (more reliable for the
+    small models); the summary itself follows the conversation's language."""
+    chunk_str = "\n".join(f"{m['role']}: {m['content']}" for m in new_chunk)
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You maintain a running summary of a conversation between a user "
+                "and an AI assistant. Merge the existing summary with the new "
+                "messages below into one short, concrete summary that preserves "
+                "important facts, names, numbers and decisions. Keep it under 300 "
+                "words - prioritise the most recent and still-relevant content, "
+                "and drop small talk and details that no longer matter. "
+                "Write the summary in the same language as the messages below."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Existing summary:\n{existing_summary or '(none yet)'}\n\n"
+                f"New messages to incorporate:\n{chunk_str}"
+            ),
+        },
+    ]
+
+
 def build_context(chat_id, model_name, messages):
     system_content = messages[0]["content"]
     history = messages[1:]
@@ -92,7 +125,7 @@ def build_context(chat_id, model_name, messages):
     last_user_msg = next(
         (m["content"] for m in reversed(history) if m["role"] == "user"), ""
     )
-    doc_context = documents.document_context_for_query(chat_id, last_user_msg)
+    doc_context, doc_sources = documents.document_context_for_query(chat_id, last_user_msg)
     if doc_context:
         system_content += "\n\n" + doc_context
 
@@ -106,27 +139,7 @@ def build_context(chat_id, model_name, messages):
         if new_chunk:
             utility_filename = config.get_utility_model_filename()
             small = model_manager.get_model(utility_filename)
-            chunk_str = "\n".join(f"{m['role']}: {m['content']}" for m in new_chunk)
-            prompt = [
-                {
-                    "role": "system",
-                    "content": (
-                        "Du oppdaterer et løpende sammendrag av en samtale mellom en "
-                        "bruker og en AI-assistent, på norsk. Slå sammen det eksisterende "
-                        "sammendraget med de nye meldingene under, til ett kort, konkret "
-                        "sammendrag som bevarer viktige fakta, navn, tall og beslutninger. "
-                        "Hold det under 300 ord - prioriter det nyeste og det som fortsatt "
-                        "er relevant, dropp smalltalk og detaljer uten betydning videre."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Eksisterende sammendrag:\n{cache.get('summary', '(ingen ennå)')}\n\n"
-                        f"Nye meldinger å innlemme:\n{chunk_str}"
-                    )
-                }
-            ]
+            prompt = _summary_prompt(cache.get("summary", ""), new_chunk)
             resp = small.create_chat_completion(messages=prompt, max_tokens=500, temperature=0.3)
             new_summary = resp["choices"][0]["message"]["content"].strip()
             chat_store.save_summary_cache(chat_id, new_summary, keep_from)
@@ -135,22 +148,18 @@ def build_context(chat_id, model_name, messages):
         summary_text = cache.get("summary", "")
         recent = history[keep_from:]
         if summary_text:
-            system_content += (
-                "\n\nSammendrag av tidligere deler av denne samtalen (eldre meldinger "
-                "er komprimert for å spare plass, men brukeren har fortsatt hele "
-                "historikken lagret):\n" + summary_text
-            )
+            system_content += "\n\n" + SUMMARY_PREFIX + summary_text
             compressed = True
     else:
         recent = history
 
     final_messages = [{"role": "system", "content": system_content}] + recent
-    return final_messages, compressed
+    return final_messages, {"compressed": compressed, "doc_sources": doc_sources}
 
 
 def estimate_context(chat_id, model_name, messages):
     llm = model_manager.ensure_only_model_loaded(model_name)
-    final_messages, compressed = build_context(chat_id, model_name, messages)
+    final_messages, meta = build_context(chat_id, model_name, messages)
     context_used = count_tokens(llm, final_messages)
     context_max = config.load_config().get("context_window", config.DEFAULT_CONTEXT)
-    return {"context_used": context_used, "context_max": context_max, "compressed": compressed}
+    return {"context_used": context_used, "context_max": context_max, "compressed": meta["compressed"]}

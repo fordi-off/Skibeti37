@@ -1,25 +1,26 @@
-// ---------------- Modellvalg ----------------
+// ---------------- Model selection ----------------
 
 async function loadModels() {
   allModels = await window.pywebview.api.list_models();
   modelLabels = {};
   allModels.forEach(m => { modelLabels[m.id] = m.name; });
 
-  pickerEl.innerHTML = "";
-  allModels.forEach((m, i) => {
-    const btn = document.createElement("button");
-    btn.className = "model-btn" + (m.id === currentModel || (!currentModel && i === 0) ? " active" : "");
-    btn.textContent = m.name;
-    btn.dataset.model = m.id;
-    btn.onclick = () => selectModel(m.id);
-    pickerEl.appendChild(btn);
+  modelSelectEl.innerHTML = "";
+  allModels.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.name;
+    modelSelectEl.appendChild(opt);
   });
+
   if (!currentModel && allModels.length > 0) currentModel = allModels[0].id;
+  if (currentModel) modelSelectEl.value = currentModel;
 }
 
 async function selectModel(id) {
+  if (!id) return;
   currentModel = id;
-  [...pickerEl.children].forEach(btn => btn.classList.toggle("active", btn.dataset.model === id));
+  modelSelectEl.value = id;
 
   if (conversation.length > 1) {
     try {
@@ -29,6 +30,8 @@ async function selectModel(id) {
       if (info && typeof info.context_used === "number") {
         updateContextMeter(info.context_used, info.context_max, info.compressed);
       }
-    } catch (err) { /* stille */ }
+    } catch (err) { /* silent */ }
   }
 }
+
+modelSelectEl.addEventListener("change", (e) => selectModel(e.target.value));

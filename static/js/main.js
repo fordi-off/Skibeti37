@@ -1,8 +1,8 @@
-// ==================== Oppstart ====================
+// ==================== Startup ====================
 
 window.addEventListener("pywebviewready", async () => {
   await loadModels();
   await refreshChatList();
   await refreshDocList();
-  await refreshSkillList();
+  await refreshSkillList(true);
 });

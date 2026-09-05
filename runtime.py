@@ -1,5 +1,5 @@
-"""Delt referanse til pywebview-vinduet, satt av app.py ved oppstart.
-Andre moduler importerer denne for å kalle window.evaluate_js(...) og
-window.create_file_dialog(...) uten sirkulære imports."""
+"""Shared reference to the pywebview window, set by app.py at startup.
+Other modules import this to call window.evaluate_js(...) and
+window.create_file_dialog(...) without circular imports."""
 
 window = None

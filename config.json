@@ -1,6 +1,6 @@
 {
   "context_window": 16384,
-  "n_threads": 6,
+  "n_threads": 12,
   "utility_model": null,
   "models": {
     "DeepSeek-R1-Distill-Qwen-7B-Uncensored.i1-Q5_K_M.gguf": {
@@ -8,7 +8,7 @@
       "active": true,
       "device": "cpu"
     },
-    "qwen2.5-1.5b-instruct-q4_k_m.gguf": {
+    "qwen2.5-1.5b-instruct-q5_k_m.gguf": {
       "display_name": "Qwen2.5 1.5b",
       "active": true,
       "device": "cpu"

@@ -1,4 +1,4 @@
-// ==================== Innstillinger-modal ====================
+// ==================== Settings modal ====================
 
 const settingsOverlayEl = document.getElementById("settings-overlay");
 
@@ -6,7 +6,7 @@ document.getElementById("settings-btn").onclick = () => {
   settingsOverlayEl.classList.remove("hidden");
   refreshSettingsModelList();
   refreshSettingsDocList();
-  refreshSettingsSkillList();
+  refreshSettingsSkillList(true);
   refreshSettingsPerformance();
 };
 document.getElementById("settings-close-btn").onclick = () => {
@@ -25,7 +25,7 @@ document.querySelectorAll(".settings-tab").forEach(tab => {
   };
 });
 
-// --- Modeller-fane ---
+// --- Models tab ---
 
 async function refreshSettingsModelList() {
   const models = await window.pywebview.api.list_all_models_settings();
@@ -91,7 +91,7 @@ async function refreshSettingsModelList() {
   });
 }
 
-// --- Dokumenter-fane ---
+// --- Documents tab ---
 
 const docPreviewOverlayEl = document.getElementById("doc-preview-overlay");
 
@@ -153,10 +153,16 @@ docPreviewOverlayEl.addEventListener("click", (e) => {
   if (e.target === docPreviewOverlayEl) docPreviewOverlayEl.classList.add("hidden");
 });
 
-// --- Skills-fane ---
+// --- Skills tab ---
 
-async function refreshSettingsSkillList() {
+let _lastSettingsSkillsJson = null;
+
+async function refreshSettingsSkillList(force) {
   const skills = await window.pywebview.api.list_skills();
+  const json = JSON.stringify(skills);
+  if (!force && json === _lastSettingsSkillsJson) return;
+  _lastSettingsSkillsJson = json;
+
   const container = document.getElementById("settings-skill-list");
   container.innerHTML = "";
 
@@ -179,8 +185,8 @@ async function refreshSettingsSkillList() {
     delBtn.textContent = "Slett";
     delBtn.onclick = async () => {
       await window.pywebview.api.delete_skill(skill.id);
-      refreshSettingsSkillList();
-      refreshSkillList();
+      refreshSettingsSkillList(true);
+      refreshSkillList(true);
     };
 
     row.appendChild(nameSpan);
@@ -196,11 +202,11 @@ document.getElementById("new-skill-save-btn").onclick = async () => {
   await window.pywebview.api.add_skill(name, content);
   document.getElementById("new-skill-name").value = "";
   document.getElementById("new-skill-content").value = "";
-  refreshSettingsSkillList();
-  refreshSkillList();
+  refreshSettingsSkillList(true);
+  refreshSkillList(true);
 };
 
-// --- Ytelse-fane (kontekstvindu + tråder) ---
+// --- Performance tab (context window + threads) ---
 
 let contextSteps = [4096, 8192, 16384, 32768, 65536, 131072];
 

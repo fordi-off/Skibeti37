@@ -1,4 +1,4 @@
-// ---------------- Dokumenter ----------------
+// ---------------- Documents ----------------
 
 async function refreshDocList() {
   if (!currentChatId) {
@@ -78,13 +78,13 @@ document.getElementById("add-doc-btn").onclick = async () => {
   }
 };
 
-// Kalles fra Python mens dokumentet blir oppsummert
+// Called from Python while the document is being summarised
 function onDocStatus(text) {
   docStatusEl.textContent = text || "";
   statusEl.textContent = text || "";
 }
 
-// --- Bibliotek-velger ---
+// --- Library picker ---
 
 const libraryPanelEl = document.getElementById("doc-library-panel");
 const libraryListEl = document.getElementById("doc-library-list");

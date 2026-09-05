@@ -1,9 +1,19 @@
-// ---------------- Skills (høyre panel - kun av/på) ----------------
+// ---------------- Skills (right panel - on/off only) ----------------
+// The backend reads the skills/ folder live on every call, so this panel
+// just needs to re-poll to notice files added/removed outside the app.
 
 const skillListEl = document.getElementById("skill-list");
+let _lastSkillsJson = null;
 
-async function refreshSkillList() {
+async function refreshSkillList(force) {
+  // Don't redraw the list out from under the pointer during a poll.
+  if (!force && skillListEl.matches(":hover")) return;
+
   const skills = await window.pywebview.api.list_skills();
+  const json = JSON.stringify(skills);
+  if (!force && json === _lastSkillsJson) return;   // nothing changed, leave the DOM alone
+  _lastSkillsJson = json;
+
   skillListEl.innerHTML = "";
 
   if (skills.length === 0) {
@@ -22,7 +32,7 @@ async function refreshSkillList() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = skill.active;
-    checkbox.onchange = async () => { await window.pywebview.api.toggle_skill(skill.id); };
+    checkbox.onchange = () => window.pywebview.api.toggle_skill(skill.id);
     const track = document.createElement("span");
     track.className = "skill-switch-track";
     switchLabel.appendChild(checkbox);
@@ -39,3 +49,13 @@ async function refreshSkillList() {
     skillListEl.appendChild(item);
   });
 }
+
+document.getElementById("refresh-skills-btn").onclick = () => refreshSkillList(true);
+window.addEventListener("focus", () => refreshSkillList());
+
+// Pick up skill files added/removed outside the app without a restart.
+setInterval(() => {
+  refreshSkillList();
+  const settingsOpen = !document.getElementById("settings-overlay").classList.contains("hidden");
+  if (settingsOpen && typeof refreshSettingsSkillList === "function") refreshSettingsSkillList();
+}, 2500);

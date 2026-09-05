@@ -1,6 +1,6 @@
-"""Delt dokumentbibliotek. Hvert dokument lagres én gang (chunking +
-embeddings for søk, pluss et langt sammendrag), og knyttes til én eller
-flere samtaler via chat_store sitt "attached_docs"-felt."""
+"""Shared document library. Each document is stored once (chunking +
+embeddings for search, plus a long summary), and linked to one or more
+conversations via chat_store's "attached_docs" field."""
 
 import json
 import os
@@ -22,9 +22,40 @@ SUMMARY_CHUNK_WORDS = 1200
 MAX_SUMMARY_CHUNKS = 25
 TOP_K_CHUNKS = 5
 
+# Framing text prepended to the retrieved excerpts, read in-context by the
+# main chat model. English instruction; the model answers in the user's
+# language regardless.
+RAG_PREFIX = (
+    "The following are the most relevant excerpts from the user's documents, retrieved "
+    "for this question. Use them to answer precisely, and reply in the language the user "
+    "is using. If the answer is not in the excerpts, say so instead of guessing:\n\n"
+)
+
 
 def doc_path(doc_id):
     return os.path.join(DOCS_DIR, f"{doc_id}.json")
+
+
+def _load_doc_meta(doc_id):
+    """id/filename/summary for one stored document, or None if it is missing."""
+    p = doc_path(doc_id)
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        data = json.load(f)
+    return {"id": doc_id, "filename": data["filename"], "summary": data["summary"]}
+
+
+def _all_doc_metas():
+    """id/filename/summary for every document in the library."""
+    metas = []
+    for fname in os.listdir(DOCS_DIR):
+        if not fname.endswith(".json"):
+            continue
+        meta = _load_doc_meta(fname[:-5])
+        if meta:
+            metas.append(meta)
+    return metas
 
 
 def chunk_text(text, chunk_size, overlap):
@@ -51,47 +82,57 @@ def list_documents(chat_id):
     chat = chat_store.load_chat_raw(chat_id)
     if not chat:
         return []
-    attached = chat.get("attached_docs", {})
     result = []
-    for doc_id, active in attached.items():
-        p = doc_path(doc_id)
-        if not os.path.exists(p):
-            continue
-        with open(p, encoding="utf-8") as f:
-            data = json.load(f)
-        result.append({
-            "id": doc_id, "filename": data["filename"],
-            "summary": data["summary"], "active": active,
-        })
+    for doc_id, active in chat.get("attached_docs", {}).items():
+        meta = _load_doc_meta(doc_id)
+        if meta:
+            result.append({**meta, "active": active})
     return result
 
 
 def list_available_documents(chat_id):
     chat = chat_store.load_chat_raw(chat_id) or {}
     attached_ids = set(chat.get("attached_docs", {}).keys())
-    result = []
-    for fname in os.listdir(DOCS_DIR):
-        if not fname.endswith(".json"):
-            continue
-        doc_id = fname[:-5]
-        if doc_id in attached_ids:
-            continue
-        with open(os.path.join(DOCS_DIR, fname), encoding="utf-8") as f:
-            data = json.load(f)
-        result.append({"id": doc_id, "filename": data["filename"], "summary": data["summary"]})
-    return result
+    return [meta for meta in _all_doc_metas() if meta["id"] not in attached_ids]
 
 
 def list_all_documents_settings():
-    result = []
-    for fname in os.listdir(DOCS_DIR):
-        if not fname.endswith(".json"):
-            continue
-        doc_id = fname[:-5]
-        with open(os.path.join(DOCS_DIR, fname), encoding="utf-8") as f:
-            data = json.load(f)
-        result.append({"id": doc_id, "filename": data["filename"], "summary": data["summary"]})
-    return result
+    return _all_doc_metas()
+
+
+def _summarize_chunk_prompt(chunk):
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You summarise parts of a document. Capture concrete facts, names, "
+                "numbers and the structure of the text. Be precise, not generic. "
+                "Write the summary in the same language as the document."
+            ),
+        },
+        {"role": "user", "content": f"Summarise this part:\n\n{chunk}"},
+    ]
+
+
+def _combine_summaries_prompt(partial_summaries):
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are given several partial summaries of the same document, in order. "
+                "Merge them into one thorough, structured summary with headings "
+                "(markdown ##) for the different parts/themes. Keep concrete details and "
+                "facts - do not generalise away important content. Aim for 400-700 words. "
+                "Write the summary in the same language as the partial summaries."
+            ),
+        },
+        {
+            "role": "user",
+            "content": "\n\n---\n\n".join(
+                f"Part {i + 1}:\n{s}" for i, s in enumerate(partial_summaries)
+            ),
+        },
+    ]
 
 
 def add_document(chat_id):
@@ -130,39 +171,17 @@ def add_document(chat_id):
 
     for i, chunk in enumerate(summary_chunks):
         status(f"Oppsummerer {filename}: del {i + 1}/{len(summary_chunks)}")
-        prompt = [
-            {
-                "role": "system",
-                "content": (
-                    "Du oppsummerer deler av et dokument på norsk. Fang opp konkrete "
-                    "fakta, navn, tall og strukturen i teksten. Vær presis, ikke generisk."
-                )
-            },
-            {"role": "user", "content": f"Oppsummer denne delen:\n\n{chunk}"}
-        ]
-        resp = small.create_chat_completion(messages=prompt, max_tokens=350, temperature=0.3)
+        resp = small.create_chat_completion(
+            messages=_summarize_chunk_prompt(chunk), max_tokens=350, temperature=0.3
+        )
         partial_summaries.append(resp["choices"][0]["message"]["content"].strip())
 
     status(f"Setter sammen sluttsammendrag for {filename}...")
     if len(partial_summaries) > 1:
-        combine_prompt = [
-            {
-                "role": "system",
-                "content": (
-                    "Du får flere delsammendrag av samme dokument, i rekkefølge. Slå dem "
-                    "sammen til ett grundig, strukturert sammendrag på norsk med overskrifter "
-                    "(markdown ##) for de ulike delene/temaene. Behold konkrete detaljer og "
-                    "fakta - ikke generaliser bort viktig innhold. Sikt på 400-700 ord."
-                )
-            },
-            {
-                "role": "user",
-                "content": "\n\n---\n\n".join(
-                    f"Del {i+1}:\n{s}" for i, s in enumerate(partial_summaries)
-                )
-            }
-        ]
-        resp = small.create_chat_completion(messages=combine_prompt, max_tokens=1200, temperature=0.3)
+        resp = small.create_chat_completion(
+            messages=_combine_summaries_prompt(partial_summaries),
+            max_tokens=1200, temperature=0.3,
+        )
         final_summary = resp["choices"][0]["message"]["content"].strip()
     else:
         final_summary = partial_summaries[0] if partial_summaries else "(tomt dokument)"
@@ -237,15 +256,24 @@ def preview_document(doc_id):
     return {"filename": data["filename"], "summary": data["summary"], "full_text": full_text}
 
 
+def _snippet(text, words=40):
+    parts = text.split()
+    return " ".join(parts[:words]) + ("..." if len(parts) > words else "")
+
+
 def document_context_for_query(chat_id, query_text):
+    """Returns (context_string_or_None, sources). `sources` is a list of
+    {filename, snippet, score} for the chunks actually included, so the UI
+    can show which document excerpts a reply was based on."""
+    empty = (None, [])
     if not chat_id:
-        return None
+        return empty
     chat = chat_store.load_chat_raw(chat_id)
     if not chat:
-        return None
+        return empty
     attached = chat.get("attached_docs", {})
     if not attached:
-        return None
+        return empty
 
     all_chunks = []
     all_vectors = []
@@ -262,7 +290,7 @@ def document_context_for_query(chat_id, query_text):
             all_vectors.append(chunk["embedding"])
 
     if not all_chunks:
-        return None
+        return empty
 
     embed_model = model_manager.get_embedder()
     query_vec = embed_model.create_embedding(query_text)["data"][0]["embedding"]
@@ -271,12 +299,14 @@ def document_context_for_query(chat_id, query_text):
     top_indices = np.argsort(similarities)[::-1][:TOP_K_CHUNKS]
 
     excerpts = []
+    sources = []
     for idx in top_indices:
         text, filename = all_chunks[idx]
-        excerpts.append(f"[Fra {filename}]\n{text}")
+        excerpts.append(f"[From {filename}]\n{text}")
+        sources.append({
+            "filename": filename,
+            "snippet": _snippet(text),
+            "score": round(float(similarities[idx]), 3),
+        })
 
-    return (
-        "Følgende er de mest relevante utdragene fra brukerens dokumenter, hentet basert "
-        "på spørsmålet. Bruk dem til å svare presist. Hvis svaret ikke finnes i utdragene, "
-        "si ifra istedenfor å gjette:\n\n" + "\n\n---\n\n".join(excerpts)
-    )
+    return RAG_PREFIX + "\n\n---\n\n".join(excerpts), sources

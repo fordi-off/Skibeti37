@@ -14,10 +14,6 @@
   <div class="sidebar-header">
     <h1>Skibeti37</h1>
     <span>lokal modell-lab</span>
-    <div class="lang-toggle" id="lang-toggle">
-      <button class="lang-btn active" data-lang="no">Norsk</button>
-      <button class="lang-btn" data-lang="en">English</button>
-    </div>
   </div>
 
   <div id="chats-section" class="sidebar-section">
@@ -56,7 +52,7 @@
 
 <div id="main">
   <header>
-    <div class="model-picker" id="model-picker"></div>
+    <select id="model-select" class="model-select" title="Velg modell"></select>
     <button id="settings-btn" title="Innstillinger">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -85,13 +81,14 @@
 <div id="skills-sidebar">
   <div class="section-head">
     <h2>Skills</h2>
+    <button class="icon-btn" id="refresh-skills-btn" title="Oppdater skills-listen (leser skills/-mappen på nytt)">↻</button>
   </div>
   <div class="scroll-list" id="skill-list">
     <div class="empty-hint">Ingen skills ennå.</div>
   </div>
 </div>
 
-<!-- ---------- Innstillinger-modal ---------- -->
+<!-- ---------- Settings modal ---------- -->
 <div id="settings-overlay" class="hidden">
   <div id="settings-modal">
     <div class="settings-header">
@@ -149,7 +146,7 @@
   </div>
 </div>
 
-<!-- ---------- Dokument-forhåndsvisning ---------- -->
+<!-- ---------- Document preview ---------- -->
 <div id="doc-preview-overlay" class="hidden">
   <div id="doc-preview-modal">
     <div class="settings-header">
@@ -161,6 +158,17 @@
       <div id="doc-preview-summary"></div>
       <h3>Full tekst (rekonstruert fra indekserte biter)</h3>
       <div id="doc-preview-fulltext" style="white-space: pre-wrap;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Confirm dialog ---------- -->
+<div id="confirm-overlay" class="hidden">
+  <div id="confirm-modal">
+    <p id="confirm-text"></p>
+    <div class="confirm-actions">
+      <button id="confirm-cancel-btn" class="settings-small-btn">Avbryt</button>
+      <button id="confirm-ok-btn" class="confirm-danger-btn">Fortsett</button>
     </div>
   </div>
 </div>

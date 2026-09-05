@@ -1,4 +1,4 @@
-// ---------------- Samtaleliste ----------------
+// ---------------- Chat list ----------------
 
 async function refreshChatList() {
   const chats = await window.pywebview.api.list_chats();
@@ -67,26 +67,9 @@ async function openChat(chatId) {
   currentChatId = data.id;
   currentChatName = data.name;
   conversation = data.messages;
-  setLanguage(data.language || "no");
   if (data.model) selectModel(data.model);
 
-  chatEl.innerHTML = "";
-  let hasContent = false;
-  for (const msg of conversation) {
-    if (msg.role === "user") {
-      addUserMessage(msg.content);
-      hasContent = true;
-    } else if (msg.role === "assistant") {
-      const { contentEl } = addAssistantMessage(currentModel);
-      contentEl.innerHTML = formatInline(msg.content);
-      enhanceContent(contentEl);
-      hasContent = true;
-    }
-  }
-  if (!hasContent) {
-    chatEl.innerHTML = `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`;
-  }
-
+  renderConversation();
   contextMeterEl.classList.remove("visible");
   refreshChatList();
   refreshDocList();
@@ -96,8 +79,7 @@ function startNewChat() {
   if (isGenerating) return;
   currentChatId = null;
   currentChatName = null;
-  setLanguage("no");
-  conversation = [{ role: "system", content: systemPromptFor("no") }];
+  conversation = [{ role: "system", content: SYSTEM_PROMPT }];
   chatEl.innerHTML = `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`;
   contextMeterEl.classList.remove("visible");
   refreshChatList();
@@ -112,7 +94,7 @@ async function persistChat() {
     currentChatName = firstUser ? firstUser.content.slice(0, 45) : "Ny samtale";
   }
   const savedId = await window.pywebview.api.save_chat(
-    currentChatId, currentChatName, currentModel, JSON.stringify(conversation), currentLanguage
+    currentChatId, currentChatName, currentModel, JSON.stringify(conversation)
   );
   currentChatId = savedId;
   refreshChatList();
@@ -122,7 +104,7 @@ async function ensureChatExists() {
   if (!currentChatId) {
     currentChatName = currentChatName || "Ny samtale";
     currentChatId = await window.pywebview.api.save_chat(
-      null, currentChatName, currentModel, JSON.stringify(conversation), currentLanguage
+      null, currentChatName, currentModel, JSON.stringify(conversation)
     );
     refreshChatList();
   }
@@ -130,32 +112,70 @@ async function ensureChatExists() {
 }
 
 
-// ---------------- Chat-visning ----------------
+// ---------------- Chat view ----------------
+
+const COPY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+const CHECK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+const EDIT_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+const REGEN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
 
 function clearEmptyState() {
   const empty = chatEl.querySelector(".empty-state");
   if (empty) empty.remove();
 }
 
-function addUserMessage(text) {
+// Rebuilds the whole chat view from `conversation`. Every rendered .msg node
+// carries data-ci = its index in `conversation`, so regenerate/edit know
+// exactly what to cut.
+function renderConversation() {
+  chatEl.innerHTML = "";
+  let hasContent = false;
+  conversation.forEach((msg, ci) => {
+    if (msg.role === "user") {
+      addUserMessage(msg.content, ci);
+      hasContent = true;
+    } else if (msg.role === "assistant") {
+      const { contentEl, div } = addAssistantMessage(currentModel, ci);
+      contentEl.innerHTML = formatInline(msg.content);
+      enhanceContent(contentEl);
+      renderDocSources(div, msg.sources);
+      hasContent = true;
+    }
+  });
+  if (!hasContent) {
+    chatEl.innerHTML = `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`;
+  }
+}
+
+function addUserMessage(text, ci) {
   clearEmptyState();
   const div = document.createElement("div");
   div.className = "msg user";
-  div.innerHTML = `<div class="bubble"></div>`;
+  if (ci != null) div.dataset.ci = ci;
+  div.innerHTML = `
+    <div class="msg-actions"><button class="msg-edit-btn" title="Rediger melding og generer på nytt herfra"></button></div>
+    <div class="bubble"></div>
+  `;
   div.querySelector(".bubble").textContent = text;
+  const editBtn = div.querySelector(".msg-edit-btn");
+  editBtn.innerHTML = EDIT_ICON;
+  editBtn.onclick = () => startEditMessage(div);
   chatEl.appendChild(div);
   chatEl.scrollTop = chatEl.scrollHeight;
+  return { div };
 }
 
-function addAssistantMessage(modelId) {
+function addAssistantMessage(modelId, ci) {
   clearEmptyState();
   const div = document.createElement("div");
   div.className = "msg assistant";
+  if (ci != null) div.dataset.ci = ci;
   div.innerHTML = `
     <div class="content"></div>
     <div class="msg-meta">
       <button class="msg-copy-btn" title="Kopier svar"></button>
-      <span class="meta-text">${modelLabels[modelId] || modelId}</span>
+      <button class="msg-regen-btn" title="Regenerer dette svaret"></button>
+      <span class="meta-text">${modelLabels[modelId] || modelId || ""}</span>
     </div>
   `;
   chatEl.appendChild(div);
@@ -166,12 +186,41 @@ function addAssistantMessage(modelId) {
   const copyBtnEl = div.querySelector(".msg-copy-btn");
   copyBtnEl.innerHTML = COPY_ICON;
   copyBtnEl.onclick = () => copyToClipboard(contentEl.innerText, copyBtnEl);
+  const regenBtnEl = div.querySelector(".msg-regen-btn");
+  regenBtnEl.innerHTML = REGEN_ICON;
+  regenBtnEl.onclick = () => regenerateMessage(div);
 
-  return { contentEl, metaTextEl, copyBtnEl };
+  return { contentEl, metaTextEl, copyBtnEl, div };
 }
 
-const COPY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-const CHECK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+function renderDocSources(msgEl, sources) {
+  const existing = msgEl.querySelector(".doc-sources");
+  if (existing) existing.remove();
+  if (!sources || !sources.length) return;
+
+  const details = document.createElement("details");
+  details.className = "doc-sources";
+  const summary = document.createElement("summary");
+  summary.textContent =
+    sources.length === 1 ? "1 dokumentutdrag brukt i svaret" : `${sources.length} dokumentutdrag brukt i svaret`;
+  details.appendChild(summary);
+
+  sources.forEach(src => {
+    const item = document.createElement("div");
+    item.className = "doc-source-item";
+    const name = document.createElement("div");
+    name.className = "doc-source-name";
+    name.textContent = src.score != null ? `${src.filename}  ·  likhet ${src.score}` : src.filename;
+    const snip = document.createElement("div");
+    snip.className = "doc-source-snippet";
+    snip.textContent = src.snippet || "";
+    item.appendChild(name);
+    item.appendChild(snip);
+    details.appendChild(item);
+  });
+
+  msgEl.appendChild(details);
+}
 
 async function copyToClipboard(text, btn) {
   try {
@@ -220,25 +269,53 @@ function enhanceContent(contentEl) {
   });
 }
 
-async function sendMessage(e) {
-  e.preventDefault();
-  const text = inputEl.value.trim();
-  if (!text || isGenerating || !currentModel) return;
+function autoGrow(ta) {
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 320) + "px";
+}
 
-  inputEl.value = "";
-  addUserMessage(text);
-  conversation.push({ role: "user", content: text });
 
+// ---------------- Sending / stopping / regenerating / editing ----------------
+
+// While a reply is streaming, the Send button becomes a Stop button.
+function enterGeneratingUI(statusText) {
   isGenerating = true;
-  sendBtn.disabled = true;
-  statusEl.textContent = `genererer med ${modelLabels[currentModel] || currentModel}...`;
+  sendBtn.disabled = false;
+  sendBtn.textContent = "Stopp";
+  sendBtn.classList.add("stop");
+  statusEl.textContent = statusText;
+}
 
-  const { contentEl, metaTextEl } = addAssistantMessage(currentModel);
-  const isReasoning = (modelLabels[currentModel] || currentModel).toLowerCase().includes("deepseek")
-    || currentModel.toLowerCase().includes("deepseek");
+function exitGeneratingUI() {
+  isGenerating = false;
+  sendBtn.disabled = false;
+  sendBtn.textContent = "Send";
+  sendBtn.classList.remove("stop");
+  statusEl.textContent = "";
+}
+
+async function stopGeneration() {
+  if (!isGenerating) return;
+  sendBtn.disabled = true;            // re-enabled by onDone once the stream actually stops
+  statusEl.textContent = "stopper...";
+  try {
+    await window.pywebview.api.stop_generation();
+  } catch (err) { /* onDone still fires */ }
+}
+
+// Kicks off a model reply for the current `conversation` (which must already
+// end with a user message). Shared by first send, regenerate and edit.
+async function runGeneration() {
+  if (!currentModel || isGenerating) return;
+
+  enterGeneratingUI(`genererer med ${modelLabels[currentModel] || currentModel}...`);
+
+  const { contentEl, metaTextEl } = addAssistantMessage(currentModel, conversation.length);
+  const isReasoning = isReasoningModel(currentModel);
 
   window._streamState = {
     contentEl, isReasoning, metaTextEl,
+    metaBase: metaTextEl ? metaTextEl.textContent : "",
     rawBuffer: "", answerBuffer: "", thinkingEl: null, inThinking: false,
     tokenCount: 0, startTime: performance.now(), isContinuation: false,
   };
@@ -247,17 +324,113 @@ async function sendMessage(e) {
     await window.pywebview.api.send_message(currentModel, JSON.stringify(conversation), currentChatId);
   } catch (err) {
     contentEl.innerHTML += `<em>Feil: ${err}</em>`;
-    isGenerating = false;
-    sendBtn.disabled = false;
-    statusEl.textContent = "";
+    exitGeneratingUI();
   }
 }
 
-function showContinueButton(s) {
+async function sendMessage(e) {
+  e.preventDefault();
+  if (isGenerating) { stopGeneration(); return; }
+
+  const text = inputEl.value.trim();
+  if (!text || !currentModel) return;
+
+  inputEl.value = "";
+  conversation.push({ role: "user", content: text });
+  addUserMessage(text, conversation.length - 1);
+  await runGeneration();
+}
+
+async function regenerateMessage(msgEl) {
+  if (isGenerating || !currentModel) return;
+  const ci = parseInt(msgEl.dataset.ci, 10);
+  if (isNaN(ci) || conversation[ci]?.role !== "assistant") return;
+  if (conversation[ci - 1]?.role !== "user") return;
+
+  const dropped = conversation.length - ci;          // this reply + everything after it
+  const laterMsgs = dropped - 1;
+  const question = laterMsgs > 0
+    ? `Regenerer dette svaret? Det sletter svaret og de ${laterMsgs} meldingene under det, og genererer på nytt fra forrige melding.`
+    : `Regenerer dette svaret? Det forrige svaret slettes.`;
+  if (!(await confirmDialog(question))) return;
+
+  conversation.length = ci;   // cut the old reply and anything after
+  renderConversation();
+  await runGeneration();
+}
+
+async function startEditMessage(msgEl) {
+  if (isGenerating) return;
+  const ci = parseInt(msgEl.dataset.ci, 10);
+  if (isNaN(ci) || conversation[ci]?.role !== "user") return;
+
+  const original = conversation[ci].content;
+  const bubble = msgEl.querySelector(".bubble");
+  const actions = msgEl.querySelector(".msg-actions");
+
+  const editor = document.createElement("div");
+  editor.className = "msg-editor";
+  const ta = document.createElement("textarea");
+  ta.value = original;
+  const btnRow = document.createElement("div");
+  btnRow.className = "msg-editor-actions";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "settings-small-btn";
+  cancelBtn.textContent = "Avbryt";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "confirm-danger-btn";
+  saveBtn.textContent = "Lagre og generer på nytt";
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(saveBtn);
+  editor.appendChild(ta);
+  editor.appendChild(btnRow);
+
+  bubble.style.display = "none";
+  if (actions) actions.style.display = "none";
+  msgEl.appendChild(editor);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  autoGrow(ta);
+  ta.addEventListener("input", () => autoGrow(ta));
+
+  const cleanup = () => {
+    editor.remove();
+    bubble.style.display = "";
+    if (actions) actions.style.display = "";
+  };
+
+  const commit = async () => {
+    const newText = ta.value.trim();
+    if (!newText || newText === original) { cleanup(); return; }
+
+    const laterMsgs = conversation.length - ci - 1;
+    if (laterMsgs > 0) {
+      const ok = await confirmDialog(
+        `Lagre endringen? Alt etter denne meldingen (${laterMsgs} melding${laterMsgs === 1 ? "" : "er"}) ` +
+        `slettes, og et nytt svar genereres.`
+      );
+      if (!ok) return;
+    }
+
+    conversation[ci] = { role: "user", content: newText };
+    conversation.length = ci + 1;
+    renderConversation();
+    await runGeneration();
+  };
+
+  cancelBtn.onclick = cleanup;
+  saveBtn.onclick = commit;
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
+    if (e.key === "Escape") { e.preventDefault(); cleanup(); }
+  });
+}
+
+function showContinueButton(s, stopped) {
   removeContinueButton(s);
   const btn = document.createElement("button");
   btn.className = "continue-btn";
-  btn.textContent = "Svaret ble kuttet - fortsett →";
+  btn.textContent = stopped ? "Stoppet - fortsett →" : "Svaret ble kuttet - fortsett →";
   btn.onclick = continueResponse;
   s.contentEl.appendChild(btn);
 }
@@ -272,9 +445,7 @@ async function continueResponse() {
   if (!s) return;
 
   removeContinueButton(s);
-  isGenerating = true;
-  sendBtn.disabled = true;
-  statusEl.textContent = `fortsetter...`;
+  enterGeneratingUI("fortsetter...");
 
   s.isContinuation = true;
   s.tokenCount = 0;
@@ -284,16 +455,27 @@ async function continueResponse() {
     await window.pywebview.api.continue_message(currentModel, JSON.stringify(conversation), currentChatId);
   } catch (err) {
     s.contentEl.innerHTML += `<em>Feil: ${err}</em>`;
-    isGenerating = false;
-    sendBtn.disabled = false;
-    statusEl.textContent = "";
+    exitGeneratingUI();
   }
+}
+
+function renderAnswer(s, text) {
+  s.answerBuffer += text;
+  let answerEl = s.contentEl.querySelector(".answer-text");
+  if (!answerEl) {
+    answerEl = document.createElement("div");
+    answerEl.className = "answer-text";
+    s.contentEl.appendChild(answerEl);
+  }
+  answerEl.innerHTML = formatInline(s.answerBuffer);
 }
 
 function onChunk(delta) {
   const s = window._streamState;
   s.rawBuffer += delta;
   s.tokenCount += 1;
+
+  const stripped = delta.replace("<think>", "").replace("</think>", "");
 
   if (s.isReasoning) {
     if (s.rawBuffer.includes("<think>") && !s.inThinking && !s.thinkingEl) {
@@ -303,31 +485,13 @@ function onChunk(delta) {
       s.contentEl.appendChild(s.thinkingEl);
     }
     if (s.inThinking) {
-      if (s.rawBuffer.includes("</think>")) {
-        s.inThinking = false;
-        s.thinkingEl.textContent += delta.replace("</think>", "");
-      } else {
-        s.thinkingEl.textContent += delta.replace("<think>", "");
-      }
+      s.inThinking = !s.rawBuffer.includes("</think>");
+      s.thinkingEl.textContent += stripped;
     } else {
-      s.answerBuffer += delta.replace("<think>", "").replace("</think>", "");
-      let answerEl = s.contentEl.querySelector(".answer-text");
-      if (!answerEl) {
-        answerEl = document.createElement("div");
-        answerEl.className = "answer-text";
-        s.contentEl.appendChild(answerEl);
-      }
-      answerEl.innerHTML = formatInline(s.answerBuffer);
+      renderAnswer(s, stripped);
     }
   } else {
-    s.answerBuffer += delta;
-    let answerEl = s.contentEl.querySelector(".answer-text");
-    if (!answerEl) {
-      answerEl = document.createElement("div");
-      answerEl.className = "answer-text";
-      s.contentEl.appendChild(answerEl);
-    }
-    answerEl.innerHTML = formatInline(s.answerBuffer);
+    renderAnswer(s, delta);
   }
 
   chatEl.scrollTop = chatEl.scrollHeight;
@@ -336,38 +500,50 @@ function onChunk(delta) {
 async function onDone(info) {
   const s = window._streamState;
   const truncated = !!(info && info.truncated);
+  const stopped = !!(info && info.stopped);
+
+  // Stopped before any text arrived: drop the empty assistant bubble entirely.
+  if (stopped && !s.isContinuation && s.answerBuffer.trim() === "") {
+    const msgEl = s.contentEl.closest(".msg");
+    if (msgEl) msgEl.remove();
+    exitGeneratingUI();
+    return;
+  }
 
   if (s.isContinuation) {
     conversation[conversation.length - 1].content = s.answerBuffer;
   } else {
-    conversation.push({ role: "assistant", content: s.answerBuffer });
+    const msg = { role: "assistant", content: s.answerBuffer };
+    if (info && info.doc_sources && info.doc_sources.length) msg.sources = info.doc_sources;
+    conversation.push(msg);
   }
 
   const elapsed = (performance.now() - s.startTime) / 1000;
   const speed = elapsed > 0 ? (s.tokenCount / elapsed) : 0;
   if (s.metaTextEl) {
-    s.metaTextEl.textContent += ` · ${elapsed.toFixed(1)}s · ${speed.toFixed(1)} tok/s`;
+    s.metaTextEl.textContent = `${s.metaBase} · ${elapsed.toFixed(1)}s · ${speed.toFixed(1)} tok/s`;
   }
 
-  if (truncated) { showContinueButton(s); } else { removeContinueButton(s); }
+  if (truncated || stopped) { showContinueButton(s, stopped); } else { removeContinueButton(s); }
 
   if (info && typeof info.context_used === "number") {
     updateContextMeter(info.context_used, info.context_max, info.compressed);
   }
 
+  if (!s.isContinuation) {
+    const msgEl = s.contentEl.closest(".msg");
+    if (msgEl) renderDocSources(msgEl, info && info.doc_sources);
+  }
+
   enhanceContent(s.contentEl);
 
-  isGenerating = false;
-  sendBtn.disabled = false;
-  statusEl.textContent = "";
+  exitGeneratingUI();
   await persistChat();
 }
 
 function onError(message) {
   window._streamState.contentEl.innerHTML += `<em>Feil: ${message}</em>`;
-  isGenerating = false;
-  sendBtn.disabled = false;
-  statusEl.textContent = "";
+  exitGeneratingUI();
 }
 
 formEl.addEventListener("submit", sendMessage);

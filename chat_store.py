@@ -1,6 +1,6 @@
-"""Rå lesing/skriving av samtale-JSON-filer og sammendrag-cache. Brukes av
-både chats.py (samtale-CRUD) og documents.py (attach/detach), derfor egen
-modul for å unngå sirkulære imports."""
+"""Raw reading/writing of conversation JSON files and the summary cache.
+Used by both chats.py (conversation CRUD) and documents.py (attach/detach),
+hence a separate module to avoid circular imports."""
 
 import json
 import os

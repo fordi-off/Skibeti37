@@ -1,8 +1,11 @@
-"""Skills er vanlige .txt/.md-filer i skills/-mappen. Av/på-status lagres
-separat, slik at skill-filene selv forblir rene, lesbare instruksjoner."""
+"""Skills are plain .txt/.md files in the skills/ folder. The on/off status
+is stored separately, so the skill files themselves stay clean, readable
+instructions."""
 
 import json
 import os
+
+import config
 
 SKILLS_DIR = "./skills"
 os.makedirs(SKILLS_DIR, exist_ok=True)
@@ -74,8 +77,7 @@ def derive_skill_name(fname, content):
     first_line = content.strip().split("\n", 1)[0].strip() if content.strip() else ""
     if first_line.startswith("#"):
         return first_line.lstrip("#").strip()
-    stem = os.path.splitext(fname)[0].replace("_", " ").replace("-", " ").strip()
-    return (stem[:1].upper() + stem[1:]) if stem else fname
+    return config.humanize_filename(fname)
 
 
 def list_skills():

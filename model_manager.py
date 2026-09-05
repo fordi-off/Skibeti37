@@ -1,7 +1,7 @@
-"""Laster og losser GGUF-modeller via llama-cpp-python. Holder alltid
-bakgrunnsmodellen (get_utility_model_filename) i minnet, men laster ut
-andre store chat-modeller når man bytter, for å unngå å ha flere 7B-
-klasse modeller i RAM samtidig."""
+"""Loads and unloads GGUF models via llama-cpp-python. Always keeps the
+background model (get_utility_model_filename) in memory, but unloads other
+large chat models when switching, to avoid holding several 7B-class models
+in RAM at once."""
 
 import gc
 import os
@@ -17,7 +17,7 @@ def get_model(filename):
     if filename not in loaded_models:
         path = os.path.join(config.MODELS_DIR, filename)
         if not os.path.exists(path):
-            raise FileNotFoundError(f"Fant ikke modellfil: {path}")
+            raise FileNotFoundError(f"Model file not found: {path}")
         cfg = config.load_config()
         model_cfg = config.get_models_config().get(filename, {})
         device = model_cfg.get("device", "cpu")
@@ -44,8 +44,8 @@ def unload_all():
 
 
 def ensure_only_model_loaded(filename):
-    """Laster ønsket modell, og laster ut andre store chat-modeller som
-    ikke lenger er i bruk (beholder alltid bakgrunnsmodellen)."""
+    """Loads the requested model and unloads other large chat models that
+    are no longer in use (always keeps the background model)."""
     utility = config.get_utility_model_filename()
     for loaded_name in list(loaded_models.keys()):
         if loaded_name != filename and loaded_name != utility:
@@ -58,8 +58,8 @@ def get_embedder():
     if embedder is None:
         if not os.path.exists(config.EMBED_MODEL_PATH):
             raise FileNotFoundError(
-                f"Fant ikke embedding-modell: {config.EMBED_MODEL_PATH}. "
-                "Last ned nomic-embed-text-v1.5.Q4_K_M.gguf til models/-mappen."
+                f"Embedding model not found: {config.EMBED_MODEL_PATH}. "
+                "Download nomic-embed-text-v1.5.Q4_K_M.gguf into the models/ folder."
             )
         n_threads = config.load_config().get("n_threads", config.DEFAULT_THREADS)
         embedder = Llama(
