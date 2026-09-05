@@ -38,6 +38,15 @@ class Api:
         model_manager.unload_model(filename)
         return self.list_all_models_settings()
 
+    def get_last_model(self):
+        return config.load_config().get("last_model")
+
+    def set_last_model(self, filename):
+        cfg = config.load_config()
+        cfg["last_model"] = filename
+        config.save_config(cfg)
+        return filename
+
     def get_settings_overview(self):
         cfg = config.load_config()
         return {

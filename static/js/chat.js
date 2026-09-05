@@ -80,7 +80,7 @@ function startNewChat() {
   currentChatId = null;
   currentChatName = null;
   conversation = [{ role: "system", content: SYSTEM_PROMPT }];
-  chatEl.innerHTML = `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`;
+  chatEl.innerHTML = emptyStateHTML();
   contextMeterEl.classList.remove("visible");
   refreshChatList();
   refreshDocList();
@@ -143,7 +143,7 @@ function renderConversation() {
     }
   });
   if (!hasContent) {
-    chatEl.innerHTML = `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`;
+    chatEl.innerHTML = emptyStateHTML();
   }
 }
 
@@ -269,9 +269,9 @@ function enhanceContent(contentEl) {
   });
 }
 
-function autoGrow(ta) {
+function autoGrow(ta, maxPx = 320) {
   ta.style.height = "auto";
-  ta.style.height = Math.min(ta.scrollHeight, 320) + "px";
+  ta.style.height = Math.min(ta.scrollHeight, maxPx) + "px";
 }
 
 
@@ -336,10 +336,20 @@ async function sendMessage(e) {
   if (!text || !currentModel) return;
 
   inputEl.value = "";
+  autoGrow(inputEl, 160);
   conversation.push({ role: "user", content: text });
   addUserMessage(text, conversation.length - 1);
   await runGeneration();
 }
+
+// Textarea input: Enter sends, Shift+Enter inserts a newline; grow with content.
+inputEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    formEl.requestSubmit();
+  }
+});
+inputEl.addEventListener("input", () => autoGrow(inputEl, 160));
 
 async function regenerateMessage(msgEl) {
   if (isGenerating || !currentModel) return;

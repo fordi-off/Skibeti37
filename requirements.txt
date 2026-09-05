@@ -2,6 +2,8 @@
 # which often fails on Windows without admin rights (long file paths from vendor/llama.cpp).
 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 
-pywebview>=4.4
-llama-cpp-python>=0.2.90
-numpy>=1.24
+# Pinned to the versions the app was tested with, so a fresh install on
+# another machine behaves the same. Bump deliberately, not automatically.
+pywebview==6.2.1
+llama-cpp-python==0.3.35
+numpy==2.5.2

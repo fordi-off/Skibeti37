@@ -443,7 +443,7 @@
   .block-copy-btn svg { width: 14px; height: 14px; }
 
   #input-row { border-top: 1px solid var(--line); padding: 16px 32px 22px; }
-  #input-form { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; }
+  #input-form { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
 
   #input-field {
     flex: 1;
@@ -453,7 +453,12 @@
     background: white;
     font-family: inherit;
     font-size: 15px;
+    line-height: 1.4;
     color: var(--ink);
+    resize: none;
+    min-height: 46px;
+    max-height: 160px;
+    overflow-y: auto;
   }
   #input-field:focus { outline: none; border-color: var(--accent); }
   #input-field:disabled { background: var(--paper-raised); color: var(--ink-soft); }
@@ -464,6 +469,8 @@
     border: none;
     border-radius: 10px;
     padding: 0 20px;
+    height: 46px;
+    flex-shrink: 0;
     font-family: inherit;
     font-weight: 500;
     font-size: 14px;

@@ -15,7 +15,13 @@ DEFAULT_THREADS = 6
 
 
 def default_config():
-    return {"context_window": DEFAULT_CONTEXT, "n_threads": DEFAULT_THREADS, "utility_model": None, "models": {}}
+    return {
+        "context_window": DEFAULT_CONTEXT,
+        "n_threads": DEFAULT_THREADS,
+        "utility_model": None,
+        "last_model": None,
+        "models": {},
+    }
 
 
 def load_config():

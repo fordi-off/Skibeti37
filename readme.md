@@ -102,7 +102,9 @@ pip install -r requirements.txt
 `requirements.txt` points to a prebuilt CPU-wheel index for
 `llama-cpp-python`, which avoids a common Windows problem: a normal
 install tries to build from source, which often fails without admin
-rights due to overly long file paths (`vendor/llama.cpp/...`).
+rights due to overly long file paths (`vendor/llama.cpp/...`). The
+versions are pinned to what the app was tested with, so a fresh install
+on another machine behaves the same.
 
 If installation still fails, try explicitly:
 
@@ -196,7 +198,16 @@ shortcut. If you do, just make a new one.
 
 A dropdown at the top of the window switches models at any time, even
 mid-conversation. Which models appear, their display names, and
-whether they run on CPU or GPU are all configured in **Settings**.
+whether they run on CPU or GPU are all configured in **Settings**. The
+last model you picked is remembered and pre-selected on the next launch.
+
+If `models/` has no `.gguf` files, the dropdown and input are disabled
+and the chat area says so — drop model files in and restart.
+
+### Writing a message
+
+The input box grows as you type. **Enter** sends; **Shift+Enter** adds a
+newline, so you can paste multi-line text or code.
 
 ### Regenerate and edit
 

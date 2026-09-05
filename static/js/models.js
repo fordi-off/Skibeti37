@@ -13,14 +13,31 @@ async function loadModels() {
     modelSelectEl.appendChild(opt);
   });
 
-  if (!currentModel && allModels.length > 0) currentModel = allModels[0].id;
-  if (currentModel) modelSelectEl.value = currentModel;
+  const hasModels = allModels.length > 0;
+  modelSelectEl.disabled = !hasModels;
+  inputEl.disabled = !hasModels;
+  sendBtn.disabled = !hasModels;
+
+  if (!hasModels) {
+    modelSelectEl.innerHTML = `<option>Ingen modeller</option>`;
+    currentModel = null;
+    chatEl.innerHTML = emptyStateHTML();
+    return;
+  }
+
+  if (!currentModel || !allModels.some(m => m.id === currentModel)) {
+    let last = null;
+    try { last = await window.pywebview.api.get_last_model(); } catch (err) { /* silent */ }
+    currentModel = allModels.some(m => m.id === last) ? last : allModels[0].id;
+  }
+  modelSelectEl.value = currentModel;
 }
 
 async function selectModel(id) {
   if (!id) return;
   currentModel = id;
   modelSelectEl.value = id;
+  window.pywebview.api.set_last_model(id);   // fire and forget
 
   if (conversation.length > 1) {
     try {

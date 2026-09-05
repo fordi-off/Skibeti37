@@ -66,6 +66,14 @@ function formatInline(text) {
   return marked.parse(repairMarkdownTables(text || ""));
 }
 
+// Placeholder shown in the chat area when there's nothing to display. Depends
+// on whether any models were found in models/.
+function emptyStateHTML() {
+  return allModels.length
+    ? `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`
+    : `<div class="empty-state">Ingen modeller funnet.<br>Legg én eller flere <code>.gguf</code>-filer i <code>models/</code>-mappen og start appen på nytt.</div>`;
+}
+
 // ---------------- Confirm dialog ----------------
 // confirmDialog(message) -> Promise<boolean>. Used before anything that
 // deletes messages (regenerate / edit further up a conversation).
