@@ -62,6 +62,12 @@ class Api:
         model_manager.reset_embedder()
         return {"n_threads": cfg["n_threads"]}
 
+    def reset_settings(self):
+        config.reset_config()
+        model_manager.unload_all()
+        model_manager.reset_embedder()
+        return self.get_settings_overview()
+
     # ---------------- Conversations ----------------
 
     def list_chats(self):

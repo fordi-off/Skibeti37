@@ -45,7 +45,7 @@ your-folder/
 │   api.py                  ← the Api class exposed to JavaScript
 │   app.py                  ← entry point - run this
 │   config.py                ← settings, model file discovery
-│   config.json               ← generated automatically - your saved settings
+│   config.json               ← your saved settings (git-ignored, auto-created from defaults)
 │   chats.py                  ← chat CRUD, context building, compression
 │   chat_store.py             ← raw chat file read/write
 │   documents.py              ← document library and RAG search
@@ -81,7 +81,11 @@ your-folder/
 ```
 
 `chats/`, `documents/`, and `config.json` are created automatically the
-first time you run the app. All of it is plain, readable JSON — open it
+first time you run the app and are all git-ignored — they are your local
+state, not part of the project. The shipped defaults live in code
+(`config.py`, `default_config()`); `config.json` only holds your changes
+to them, and **Settings → Ytelse → Tilbakestill** (or just deleting the
+file) puts everything back. All of it is plain, readable JSON — open it
 in a text editor, back it up, or delete it manually if needed.
 
 ---
@@ -314,6 +318,11 @@ as deliberate, reusable files rather than ad-hoc chat state.
   next use.
 - **CPU threads slider** — set to roughly your CPU's physical core
   count. Also triggers a reload of all models when changed.
+- **Tilbakestill** — resets the context window, thread count and every
+  per-model setting (display name, active flag, CPU/GPU) to the code
+  defaults in `config.py`. Conversations, documents and skills are left
+  alone. Equivalent to deleting `config.json`, which the app also
+  regenerates from defaults on the next launch.
 
 ---
 

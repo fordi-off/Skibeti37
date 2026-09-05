@@ -6,6 +6,10 @@ models/
 chats/
 documents/
 
+# Local settings - written by the app, regenerated from code defaults
+# (config.py: default_config) on first run. Reset from Settings > Ytelse.
+config.json
+
 # Python
 __pycache__/
 *.pyc

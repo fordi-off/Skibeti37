@@ -33,6 +33,15 @@ def save_config(cfg):
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 
+def reset_config():
+    """Restore every setting to the code defaults in default_config().
+    models/ is re-scanned on the next load, so per-model display names,
+    active flags and CPU/GPU choices regenerate from scratch. Conversations,
+    documents and skills live in their own folders and are untouched."""
+    save_config(default_config())
+    return load_config()
+
+
 def humanize_filename(fname):
     """Turn a file name into a readable label: drop the extension, replace
     "_"/"-" with spaces and capitalise the first letter."""

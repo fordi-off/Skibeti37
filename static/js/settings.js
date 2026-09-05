@@ -240,3 +240,15 @@ document.getElementById("threads-slider").addEventListener("input", (e) => {
 document.getElementById("threads-slider").addEventListener("change", async (e) => {
   await window.pywebview.api.set_thread_count(parseInt(e.target.value));
 });
+
+document.getElementById("reset-settings-btn").onclick = async () => {
+  const ok = await confirmDialog(
+    "Tilbakestille alle innstillinger til standard? Kontekstvindu, tråder og alle " +
+    "modell-innstillinger nullstilles. Samtaler, dokumenter og skills beholdes."
+  );
+  if (!ok) return;
+  await window.pywebview.api.reset_settings();
+  await loadModels();
+  refreshSettingsModelList();
+  refreshSettingsPerformance();
+};
