@@ -1,12 +1,9 @@
 # Skibeti37 — local AI lab
 
 A fully local chat app for running and comparing language models on your
-own machine — no internet, no cloud services, and no data ever leaves the
-PC. Built for a laptop with integrated graphics (AMD Ryzen 5 7530U, 15GB
-RAM) — but works on most modern laptops/desktops.
-
-The app opens as its own window (via `pywebview`), not in a browser, and
-requires no visible server to start manually.
+own machine — no internet, no cloud services, no data ever leaves the PC.
+Opens as its own window (via `pywebview`), not in a browser, and needs no
+server to start manually.
 
 ---
 
@@ -18,10 +15,10 @@ requires no visible server to start manually.
 4. [Models you need](#models-you-need)
 5. [Running the app](#running-the-app)
 6. [Features in detail](#features-in-detail)
-7. [How document RAG works](#how-document-rag-works)
-8. [Technical architecture](#technical-architecture)
-9. [Known limitations and troubleshooting](#known-limitations-and-troubleshooting)
-10. [Other scripts in the project](#other-scripts-in-the-project)
+7. [The Settings panel](#the-settings-panel)
+8. [How document RAG works](#how-document-rag-works)
+9. [Technical architecture](#technical-architecture)
+10. [Known limitations and troubleshooting](#known-limitations-and-troubleshooting)
 11. [Possible future improvements](#possible-future-improvements)
 
 ---
@@ -29,14 +26,15 @@ requires no visible server to start manually.
 ## System requirements
 
 - **Python 3.10–3.13** (tested with 3.13)
-- **Windows** (the instructions below are Windows-specific, but the app is
-  pure Python and should work on macOS/Linux with the same setup)
+- **Windows** (instructions below are Windows-specific; the app is pure
+  Python and should work on macOS/Linux with the same setup)
 - At least **8GB of free RAM** beyond what the system itself uses — 7B
-  models in 4-bit quantization use about 5-6GB
-- **No dedicated GPU required.** Testing showed that integrated graphics
-  (Vulkan acceleration) was actually **slower** than pure CPU on this type
-  of machine (shared memory bandwidth between CPU and iGPU) — the app
-  therefore runs everything on CPU by default
+  models in 4-bit quantization use roughly 5-6GB
+- **No dedicated GPU required.** Testing showed integrated graphics
+  (Vulkan acceleration) was actually **slower** than pure CPU on typical
+  laptop hardware (shared memory bandwidth between CPU and iGPU) — CPU
+  is the sane default, though a GPU toggle exists per model if you want
+  to try it on your own hardware
 
 ---
 
@@ -44,20 +42,47 @@ requires no visible server to start manually.
 
 ```
 your-folder/
-├── app.py                  ← main program, run this
-├── requirements.txt
-├── README.md                ← this file
-├── static/
-│   ├── index.html            ← the entire interface (HTML/CSS/JS)
-│   └── marked.min.js         ← markdown rendering, loaded locally (offline)
-├── models/                  ← your downloaded .gguf model files (see below)
-├── chats/                   ← created automatically - one .json file per conversation
-└── documents/                ← created automatically - documents, sorted per chat ID
+│   api.py                  ← the Api class exposed to JavaScript
+│   app.py                  ← entry point - run this
+│   config.py                ← settings, model file discovery
+│   config.json               ← generated automatically - your saved settings
+│   chats.py                  ← chat CRUD, context building, compression
+│   chat_store.py             ← raw chat file read/write
+│   documents.py              ← document library and RAG search
+│   generation.py             ← streaming chat completion
+│   model_manager.py          ← loading/unloading GGUF models
+│   runtime.py                ← shared window reference
+│   skills.py                  ← file-based skills
+│   requirements.txt
+│   README.md
+│
+├───chats/                   ← created automatically - one .json file per conversation
+│   └───_context_summaries/    ← rolling-summary cache for long conversations
+├───documents/                ← created automatically - the shared document library
+├───models/                    ← your downloaded .gguf model files (see below)
+├───skills/
+│       anti-ai-slop.md         ← the built-in writing-style skill
+│
+└───static/
+    │   index.html              ← page structure only
+    │   marked.min.js            ← markdown rendering, loaded locally (offline)
+    │
+    ├───css/
+    │       styles.css
+    │
+    └───js/
+            state.js              ← shared state, DOM refs, formatting helpers
+            models.js               ← model picker
+            chat.js                 ← chat list + message rendering/streaming
+            documents.js             ← document panel + library picker
+            skills.js                ← right-panel skill switches
+            settings.js               ← settings modal (all tabs)
+            main.js                   ← startup
 ```
 
-`chats/` and `documents/` are created automatically the first time you run
-the app. Both are plain, readable JSON — you can open them in a text
-editor, back them up, or delete them manually if needed.
+`chats/`, `documents/`, and `config.json` are created automatically the
+first time you run the app. All of it is plain, readable JSON — open it
+in a text editor, back it up, or delete it manually if needed.
 
 ---
 
@@ -71,9 +96,8 @@ pip install -r requirements.txt
 
 `requirements.txt` points to a prebuilt CPU-wheel index for
 `llama-cpp-python`, which avoids a common Windows problem: a normal
-installation tries to build from source, which often fails without admin
-rights due to overly long file paths in Windows (`vendor/llama.cpp/...`).
-This method avoids that problem entirely.
+install tries to build from source, which often fails without admin
+rights due to overly long file paths (`vendor/llama.cpp/...`).
 
 If installation still fails, try explicitly:
 
@@ -88,31 +112,33 @@ pip install pywebview numpy
 mkdir models
 ```
 
-Download the model files (see the next section) and place them there.
+Download the model files (see below) and place them there.
 
 ---
 
 ## Models you need
 
 All are GGUF files (quantized models optimized for CPU via `llama.cpp`).
-Download directly from the Hugging Face website (recommended if
-`huggingface-cli` gives you trouble) or via the command line.
+**Models are discovered automatically** — the app scans `models/*.gguf`
+on startup, so any file you drop in there shows up in the model picker
+(and in Settings) the next time you launch. No code editing required.
 
-| Model | Filename expected by the app | Use case |
-|---|---|---|
-| **Qwen2.5-1.5B-Instruct** | `qwen2.5-1.5b-instruct-q4_k_m.gguf` | Fast, simple chat (best in English) |
-| **Qwen2.5-7B-Instruct** | `qwen2.5-7b-instruct-q4_k_m.gguf` | Default model — best at Norwegian |
-| **DeepSeek-R1-Distill-Qwen-7B-Uncensored** | `DeepSeek-R1-Distill-Qwen-7B-Uncensored.i1-Q5_K_M.gguf` | Reasoning/math/logic (English recommended) |
-| **nomic-embed-text-v1.5** | `nomic-embed-text-v1.5.Q4_K_M.gguf` | Only for document search (RAG), not a chat model |
+| Model | Purpose |
+|---|---|
+| **Qwen2.5-1.5B-Instruct** | Fast, simple chat (best in English); doubles as the background model for document summaries and conversation compression when it's your smallest active model |
+| **Qwen2.5-7B-Instruct** | Main model — best at Norwegian |
+| **DeepSeek-R1-Distill-Qwen-7B-Uncensored** | Reasoning/math/logic (English recommended — see limitations below) |
+| **nomic-embed-text-v1.5** | Required for document search (RAG). Not a chat model, and won't appear in the model picker — the app uses it internally |
 
 Download sources:
 - Qwen2.5: `https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF` (and `-1.5B-Instruct-GGUF`)
 - DeepSeek-R1 uncensored: `https://huggingface.co/mradermacher/DeepSeek-R1-Distill-Qwen-7B-Uncensored-i1-GGUF`
 - nomic-embed: `https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF`
 
-The filenames in the table **must match exactly** what's in the `MODELS`
-dict at the top of `app.py` — update the filename in the code if you
-download a different quantization variant (e.g. Q5 instead of Q4).
+The embedding model's filename must stay
+`nomic-embed-text-v1.5.Q4_K_M.gguf` (or you'll need to update the path
+in `config.py`) — every other `.gguf` file you add is picked up
+automatically under whatever name it has.
 
 ---
 
@@ -122,9 +148,9 @@ download a different quantization variant (e.g. Q5 instead of Q4).
 python app.py
 ```
 
-A dedicated window opens immediately — no browser, no `localhost` address
-to remember. Models are loaded only when actually used (lazy loading), so
-startup is fast.
+The window opens already maximized, with normal borders and title bar
+(you can resize or un-maximize it like any other window). Models load
+only when actually used (lazy loading), so startup is fast.
 
 ---
 
@@ -132,203 +158,263 @@ startup is fast.
 
 ### Model selection
 
-Three buttons at the top let you switch models at any time, even mid-
-conversation:
-
-- **1.5B · fast** — for simple, quick English questions
-- **7B · standard** — the main model, clearly best at Norwegian
-- **R1 · reasoning** — for math/logic/planning, shows its thinking
-  process in a separate field (see below)
+Buttons across the top let you switch models at any time, even
+mid-conversation. Which models appear, their display names, and
+whether they run on CPU or GPU are all configured in **Settings**.
 
 ### Conversations (left sidebar, top)
 
-- **"+ New"** starts an empty conversation
-- Each conversation is automatically saved as its own file in `chats/`
-  once the first reply finishes generating
-- Click a conversation in the list to reopen it — full history and
-  settings (model, language) are restored
-- **Double-click the name** to rename the conversation
-- The **×** button (shown on hover) permanently deletes the conversation,
-  including its associated documents
+- **"+ Ny"** starts an empty conversation
+- Each conversation auto-saves to `chats/` after its first reply
+- Click a conversation to reopen it — full history, model, language,
+  and attached documents are all restored
+- **Double-click the name** to rename it
+- **×** (on hover) deletes the conversation permanently, including its
+  document attachments (the documents themselves stay in the library)
 
 ### Language switch
 
-Two buttons, **Norwegian** / **English**, right below the app title. This
-is a **per-conversation** setting: choosing "Norwegian" rewrites the
-system prompt to explicitly instruct the model to always answer in
-Norwegian, regardless of what language the question is asked in. Solves
-the problem where models sometimes answer in English even when the
-question was in Norwegian.
-
-The setting is saved with the rest of the conversation and restored when
-reopened later. New conversations always start in Norwegian.
+**Norsk** / **English** buttons below the title — a **per-conversation**
+setting. Rewrites the system prompt to explicitly demand that language
+regardless of what's asked, since models sometimes answer in the wrong
+language otherwise. New conversations default to Norwegian.
 
 ### Speed display
 
-Below each reply you'll see something like `7B · standard · 12.4s · 5.8
-tok/s`. This is an approximation based on the number of text chunks
-received divided by actual elapsed time — reliable enough to compare
-models and settings against each other, but not a 100% exact token count.
+Under each reply: `7B · standard · 12.4s · 5.8 tok/s`. An approximation
+based on text chunks received over actual elapsed time — reliable for
+comparing models/settings, not a byte-exact token count.
 
-### Documents and RAG (left sidebar, bottom)
+### Context usage meter
 
-See the dedicated section below — this is the most complex feature in
-the app.
+A thin bar above the input field shows real token usage (via the
+model's own tokenizer), e.g. `3400 / 16384 tokens (21%)`, turning amber
+then red as it fills. Updates immediately when you switch models, not
+just after a reply.
+
+### Automatic conversation compression
+
+Once a conversation passes 10 messages, older messages get folded into
+a running summary (generated by the smallest active model) instead of
+being sent in full every time. The last 10 messages always go through
+verbatim. Nothing in your saved chat history is ever shortened — only
+what gets sent to the model behind the scenes.
+
+### Documents (left sidebar, bottom) — a shared library
+
+See the RAG section below for the mechanism. In short: documents are
+indexed **once** into a shared library, and individually **attached**
+to whichever conversations need them.
+
+- **"+ Ny fil"** uploads and indexes a new file, auto-attaching it to
+  the current conversation
+- **"📚 Bibliotek"** lets you attach a document you already indexed in
+  a different conversation, without re-processing it
+- The checkbox toggles a document on/off in the current conversation
+  without detaching it
+- **×** **detaches** the document from this conversation only — it
+  stays in the library for later use elsewhere. Deleting a document
+  everywhere happens in Settings → Dokumenter
+
+### Skills (right sidebar)
+
+Toggle switches for reusable writing-style/behavior instructions,
+applied globally across all conversations when active. Skills are
+plain `.txt`/`.md` files in `skills/` — see the Settings section below
+for creating/deleting them, or drop a file into that folder yourself
+and restart the app.
 
 ### Formatting
 
-Replies from the models are parsed as markdown via `marked.js` (runs
-entirely locally, no internet dependency):
+Replies are rendered as markdown via `marked.js` (runs entirely
+locally): code blocks, bold/italic, tables, lists, headings. A small
+repair step also fixes tables where the model generates a malformed
+separator row, which would otherwise make the whole table render as
+plain text.
 
-- **Code blocks** (\`\`\`) with monospace styling
-- **Bold/italic text**
-- **Tables**
-- **Lists** (bulleted and numbered)
-- **Headings**
+### Copy buttons
+
+Icon-only copy buttons: one under each full reply, and one on hover
+over every code block and table (tables copy as tab-separated text,
+ready to paste into a spreadsheet).
+
+### Continue button
+
+If a reply gets cut off by the token limit, a small "Svaret ble kuttet
+- fortsett →" button appears under it. Clicking it continues the exact
+same message seamlessly, with no repeated content and no new bubble.
+
+---
+
+## The Settings panel
+
+Click the gear icon (top right) to open it. Four tabs:
+
+### Modeller
+Every `.gguf` file found in `models/` (except the embedding model),
+each with:
+- An active/inactive toggle — inactive models don't appear in the main
+  picker at all
+- An editable display name
+- A CPU/GPU dropdown per model (defaults to CPU)
+
+### Dokumenter
+The entire document library, regardless of which conversations each
+document is attached to. **"Åpne"** previews a document's summary and
+reconstructed full text; **"Slett"** removes it everywhere, cleaning up
+references in every conversation automatically.
+
+### Skills
+Full CRUD here: create a new skill (name + instructions), or delete an
+existing one. The right-panel switches still just turn skills on/off —
+creation and deletion live here, since skills are meant to be managed
+as deliberate, reusable files rather than ad-hoc chat state.
+
+### Ytelse (Performance)
+- **Context window slider** — doubles at each step (4096 → 8192 →
+  16384 → 32768 → 65536 → 131072), defaulting to 16384. Changing it
+  unloads all currently loaded models so the new size takes effect on
+  next use.
+- **CPU threads slider** — set to roughly your CPU's physical core
+  count. Also triggers a reload of all models when changed.
 
 ---
 
 ## How document RAG works
 
-RAG = Retrieval-Augmented Generation. Instead of trying to squeeze an
-entire book into the model's context window (which is too small anyway —
-8192 tokens ≈ 6000 words, while a textbook is easily 20,000+ words), the
-following happens:
+RAG = Retrieval-Augmented Generation. Instead of squeezing an entire
+document into the model's context window (far too small for anything
+book-length), the app does this:
 
-### When uploading a document (`.txt` or `.md`)
+### When you add a document
 
-1. **Splitting for search**: the document is split into ~300-word chunks
-   with some overlap, and each chunk is turned into an "embedding" (a
-   number vector representing the chunk's meaning) via `nomic-embed-text`
-2. **Structured summary**: in parallel, a long (400-700 word),
-   heading-organized summary is created via a map-reduce process: larger
-   chunks (1200 words) are each summarized by Qwen2.5-1.5B, and the
-   partial summaries are then merged into one coherent overview. This
-   summary is shown **only in the sidebar** for your own reference — it
-   is not automatically sent to the main model
-3. Status is shown continuously ("Summarizing part 3/8...") and the chat
-   is locked (input field and send button disabled) until the process
-   finishes
+1. **Chunking for search**: split into ~300-word pieces with overlap,
+   each turned into an embedding (search vector) via `nomic-embed-text`
+2. **Structured summary**: separately, a long (400-700 word),
+   heading-organized summary is built via map-reduce — larger chunks
+   (1200 words) are each summarized by the background model, then
+   merged into one coherent overview. This is for your own reading in
+   the sidebar/Settings preview; it is **not** sent to the main model
+3. The document is saved once to the shared library and attached to
+   whichever conversation you were in
 
-### On every question in the chat
+### On every question
 
-1. Your question is turned into an embedding
-2. The **5 most relevant chunks** from all active documents in the
-   conversation are retrieved based on similarity to the question
-   (cosine similarity)
-3. Only these chunks are sent to the main model as context — precise and
-   fast, regardless of how large the document is
+1. Your question is embedded
+2. The 5 most relevant chunks across all **active, attached** documents
+   for that conversation are retrieved by cosine similarity
+3. Only those chunks go to the main model as context — precise and
+   fast, regardless of document size
 
-### Documents are per conversation
+### Documents are shared, attachments are per-conversation
 
-Each conversation has its own, separate set of documents (stored in
-`documents/<chat-id>/`). Adding a document in one conversation won't
-make it appear in another. Deleting a conversation automatically deletes
-its associated documents too.
-
-### Per-document checkbox
-
-Lets you toggle a document on/off without deleting it — useful if you
-have several documents in the same conversation but only want one of
-them used right now.
+The document (its text, chunks, and embeddings) is stored once. Which
+conversations can see it is a separate, lightweight link stored in each
+conversation's own file. Detaching removes that link; deleting (from
+Settings) removes the document and every link to it.
 
 ---
 
 ## Technical architecture
 
-No HTTP server, no browser. Communication works like this:
+No HTTP server, no browser tab. Communication flow:
 
 ```
-static/index.html (JavaScript)
+static/js/*.js (JavaScript)
         │
         │  window.pywebview.api.send_message(...)
         ▼
-   app.py (Python, the Api class)
+   api.py (Api class - thin delegator)
         │
-        │  runs in its own background thread, calls llama-cpp-python
+        ▼
+   chats.py / documents.py / generation.py / etc. (actual logic)
+        │
+        │  runs in a background thread, calls llama-cpp-python
         ▼
    window.evaluate_js("onChunk(...)")   ← pushes text chunks back to the page live
 ```
 
-`pywebview` uses Windows' built-in WebView2 component (the same engine as
-Edge, but without the browser window around it) and exposes a direct
-Python↔JavaScript bridge. Streaming of replies works by Python calling
-`window.evaluate_js()` for each text chunk the model generates, which
-triggers the `onChunk()` function on the page in real time.
+`pywebview` uses Windows' built-in WebView2 component (same engine as
+Edge, without the browser chrome) and exposes a direct Python↔JavaScript
+bridge. Streaming works by Python calling `window.evaluate_js()` for
+each generated text chunk, triggering `onChunk()` on the page instantly.
 
-All chat and document data is stored as JSON files on disk — no
-database, no hidden binary formats.
+### Backend module responsibilities
+
+| Module | Owns |
+|---|---|
+| `config.py` | Reading/writing `config.json`, scanning `models/` for `.gguf` files |
+| `model_manager.py` | Loading/unloading Llama instances, the embedder |
+| `chat_store.py` | Raw chat JSON file I/O (used by both `chats.py` and `documents.py`) |
+| `chats.py` | Chat CRUD, context building, rolling-summary compression |
+| `documents.py` | The document library, chunking/embedding, attach/detach, RAG retrieval |
+| `skills.py` | Reading/writing skill files, active-state tracking |
+| `generation.py` | The actual streaming generation loop |
+| `api.py` | Exposes all of the above to JavaScript under stable method names |
+| `runtime.py` | Holds the live `window` reference so other modules can call `evaluate_js` without circular imports |
+| `app.py` | Just creates the window and starts the event loop |
+
+### Frontend file responsibilities
+
+`state.js` (shared state/DOM refs/formatting) loads first, followed by
+`models.js`, `chat.js`, `documents.js`, `skills.js`, `settings.js`, and
+finally `main.js` (which just kicks off the initial data load once
+pywebview's bridge is ready). All files share the same global scope
+(classic `<script>` tags, not modules), so load order only matters for
+top-level code that runs immediately — event handlers and function
+calls triggered later work regardless of file order.
+
+All chat, document, and skill data is stored as plain JSON/text files
+on disk — no database, no hidden binary formats.
 
 ---
 
 ## Known limitations and troubleshooting
 
-**GPU is slower than CPU on this machine.** Thoroughly tested with
-Vulkan acceleration — integrated graphics shares memory bandwidth with
-the CPU, so `n_gpu_layers=-1` gave 14-25% *worse* performance than pure
-CPU for all three models. The app therefore hardcodes `n_gpu_layers=0`.
+**GPU is slower than CPU on typical laptop iGPUs.** Vulkan acceleration
+tested slower than pure CPU across all three models on integrated
+graphics, due to shared memory bandwidth with the CPU. CPU is the
+default; the GPU toggle in Settings is there if your hardware differs.
 
 **Thermal throttling.** After several heavy model runs in a row, a thin
-laptop CPU (like the Ryzen 5 7530U) can automatically lower its clock
-speed to avoid overheating. Speed can therefore vary significantly
-depending on how long the machine has been working continuously.
+laptop CPU can lower its clock speed to avoid overheating. Speed can
+vary noticeably depending on how long the machine has been working.
 
-**DeepSeek-R1 and Norwegian are a bad combination.** Testing showed that
-DeepSeek's `<think>` reasoning often becomes unreliable or outright wrong
-when input/output is Norwegian (it's heavily trained on English
-reasoning). Recommendation: use DeepSeek only for English reasoning
-tasks, and Qwen2.5-7B for everything in Norwegian.
+**DeepSeek-R1 and Norwegian are a bad combination.** Its `<think>`
+reasoning is trained heavily on English and becomes unreliable in
+Norwegian. Use DeepSeek for English reasoning tasks; use Qwen2.5-7B for
+Norwegian.
 
-**Repetition and language slips.** An overly aggressive
-`frequency_penalty` turned out to push models (especially Qwen, which is
-developed by Alibaba) into suddenly code-switching to Chinese mid-reply,
-once common Norwegian words became "too expensive" to repeat. Fixed by
-lowering `frequency_penalty` to 0.05 and `repeat_penalty` to 1.1 in
-`SAMPLING_PARAMS` in `app.py`.
+**Repetition penalty and language slips.** An overly aggressive
+`frequency_penalty` was found to push Qwen models into code-switching
+to Chinese mid-reply once common words became "too expensive" to
+repeat. Fixed by keeping `frequency_penalty` low (0.05) and relying more
+on `repeat_penalty` (1.1) — see `generation.py`.
 
-**Multiple system messages confuse smaller models.** Sending document
-context as a separate, second system message (instead of merging it with
-the first) caused the 1.5B model in particular to hallucinate nonsensical
-"privacy/policy" responses. The fix was to always merge everything into
-a single system message.
+**Multiple system messages confuse smaller models.** Document context,
+skills, and the compression summary are all merged into a single
+system message rather than appended as separate ones — sending several
+system-role messages was found to make smaller models hallucinate
+nonsensical "policy" responses.
 
-**If a model file isn't found**, the app shows a clear error in the chat
-with the full file path — double-check that the filename in the `MODELS`
-dict in `app.py` matches exactly what you have in the `models/` folder.
+**If a model file isn't found**, the app raises a clear error with the
+full path — check Settings → Modeller to confirm the file is actually
+being discovered, and that its filename matches what's on disk.
 
----
-
-## Other scripts in the project
-
-These were built along the way as experiments and benchmarks. They're
-not required to run the main app (`app.py`), but are useful references:
-
-| File | What it does |
-|---|---|
-| `chat_qwen.py` | Simple terminal chat with Qwen2.5-1.5B, no streaming |
-| `chat_reasoning.py` | Terminal chat with DeepSeek-R1, shows the thinking block separately |
-| `benchmark_qwen.py` | CPU vs GPU speed test for a single model |
-| `benchmark_all_models.py` | Compares all three models on 4 test tasks |
-| `benchmark_cpu_vs_gpu.py` | Same as above, but in both CPU and GPU mode |
-| `benchmark_with_outputs.py` | As above, but saves full response text to a report file |
-| `benchmark_norsk.py` | Same benchmark, but with Norwegian test questions |
-| `router_agent.py` | Terminal agent that routes between 1.5B and DeepSeek based on complexity |
-| `language_router_agent.py` | As above, but locks the model based on detected language |
-| `build_book_index.py` / `chat_with_book.py` | Early, standalone RAG exploration (before this was built into the app) |
-| `gui_chat.py` | Early Tkinter-based GUI (replaced by `app.py`) |
-| `server.py` + old `static/` | Early Flask-based browser version (replaced by the `pywebview` version) |
-| `start.bat` | Shortcut made for the Flask version (not needed with `app.py`, which uses no server) |
+**Existing documents from before the document-library rework won't
+carry over** if you're upgrading from an older version of this project
+— the storage format changed from per-chat folders to a shared library.
+Re-add anything you need.
 
 ---
 
 ## Possible future improvements
 
-Things worth considering going forward, but not yet built:
-
 - Support for more file formats in document upload (PDF, DOCX)
-- Ability to edit/regenerate a single reply in a conversation
-- Exporting a conversation to e.g. Markdown or PDF
-- Adjustable `TOP_K_CHUNKS` and chunk size from the interface, instead of
-  fixed values in the code
+- Editing or regenerating a single reply in a conversation
+- Exporting a conversation to Markdown or PDF
+- Adjustable `TOP_K_CHUNKS` and chunk size from the Settings UI, instead
+  of fixed values in `documents.py`
 - Showing which document excerpts were actually used in a given reply
-  (transparency about what the RAG search actually found)
+- A "watch skills folder" mechanism so new skill files show up without
+  restarting the app

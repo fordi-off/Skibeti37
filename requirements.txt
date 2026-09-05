@@ -1,0 +1,7 @@
+# Prebuilt CPU wheels for llama-cpp-python - avoids building from source,
+# which often fails on Windows without admin rights (long file paths from vendor/llama.cpp).
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+pywebview>=4.4
+llama-cpp-python>=0.2.90
+numpy>=1.24
