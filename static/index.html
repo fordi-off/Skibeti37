@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Skibeti37</title>
 <script src="marked.min.js"></script>
+<script src="highlight.min.js"></script>
 <link rel="stylesheet" href="css/styles.css">
 
 </head>
@@ -104,7 +105,8 @@
     <div class="settings-body">
 
       <div class="settings-pane active" id="pane-models">
-        <div class="settings-note">Modeller hentes automatisk fra models/-mappen. Legg til flere .gguf-filer der, og de dukker opp her neste gang du åpner appen.</div>
+        <div class="settings-note">Modeller hentes automatisk fra models/-mappen. Legg til flere .gguf-filer der, eller last ned via knappen under.</div>
+        <button id="settings-download-btn" class="settings-small-btn" style="margin-bottom: 12px;">+ Last ned modeller</button>
         <div id="settings-model-list"></div>
       </div>
 
@@ -180,12 +182,43 @@
   </div>
 </div>
 
+<!-- ---------- Model downloader ---------- -->
+<div id="setup-overlay" class="hidden">
+  <div id="setup-modal">
+    <div class="setup-header">
+      <h2 id="setup-title">Last ned modeller</h2>
+      <button id="setup-close-btn" class="icon-btn hidden" title="Lukk">×</button>
+    </div>
+
+    <div id="setup-choose" class="setup-body">
+      <p id="setup-intro"></p>
+      <div id="setup-groups"></div>
+    </div>
+
+    <div id="setup-progress" class="setup-body hidden">
+      <div id="setup-overall"></div>
+      <div id="setup-current"></div>
+      <div id="setup-list"></div>
+    </div>
+
+    <div class="setup-footer">
+      <span id="setup-total"></span>
+      <div class="setup-footer-btns">
+        <button id="setup-proceed-btn" class="settings-small-btn hidden">Fortsett til appen</button>
+        <button id="setup-cancel-btn" class="confirm-danger-btn hidden">Avbryt nedlasting</button>
+        <button id="setup-download-btn" class="setup-primary">Last ned</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="js/state.js"></script>
 <script src="js/models.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/documents.js"></script>
 <script src="js/skills.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/setup.js"></script>
 <script src="js/main.js"></script>
 
 </body>

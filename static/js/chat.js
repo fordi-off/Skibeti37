@@ -254,6 +254,14 @@ function enhanceContent(contentEl) {
     wrap.appendChild(btn);
   });
 
+  if (window.hljs) {
+    contentEl.querySelectorAll("pre code").forEach(block => {
+      if (block.dataset.highlighted) return;
+      try { hljs.highlightElement(block); } catch (err) { /* unknown language, leave plain */ }
+      block.dataset.highlighted = "1";
+    });
+  }
+
   contentEl.querySelectorAll("table").forEach(table => {
     if (table.parentElement.classList.contains("table-wrap")) return;
     const wrap = document.createElement("div");

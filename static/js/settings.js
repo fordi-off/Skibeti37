@@ -27,6 +27,11 @@ document.querySelectorAll(".settings-tab").forEach(tab => {
 
 // --- Models tab ---
 
+document.getElementById("settings-download-btn").onclick = () => {
+  settingsOverlayEl.classList.add("hidden");
+  showSetup({ firstRun: false });
+};
+
 async function refreshSettingsModelList() {
   const models = await window.pywebview.api.list_all_models_settings();
   const container = document.getElementById("settings-model-list");

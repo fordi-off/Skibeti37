@@ -71,7 +71,7 @@ function formatInline(text) {
 function emptyStateHTML() {
   return allModels.length
     ? `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`
-    : `<div class="empty-state">Ingen modeller funnet.<br>Legg én eller flere <code>.gguf</code>-filer i <code>models/</code>-mappen og start appen på nytt.</div>`;
+    : `<div class="empty-state">Ingen modeller installert.<br><button id="open-setup-btn" class="setup-primary" style="margin-top:14px;">Last ned modeller</button></div>`;
 }
 
 // ---------------- Confirm dialog ----------------

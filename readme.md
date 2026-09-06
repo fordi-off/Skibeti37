@@ -12,7 +12,7 @@ server to start manually.
 1. [System requirements](#system-requirements)
 2. [Folder structure](#folder-structure)
 3. [Installation](#installation)
-4. [Models you need](#models-you-need)
+4. [Models](#models)
 5. [Running the app](#running-the-app)
 6. [Features in detail](#features-in-detail)
 7. [The Settings panel](#the-settings-panel)
@@ -20,6 +20,7 @@ server to start manually.
 9. [Technical architecture](#technical-architecture)
 10. [Known limitations and troubleshooting](#known-limitations-and-troubleshooting)
 11. [Possible future improvements](#possible-future-improvements)
+12. [License](#license)
 
 ---
 
@@ -52,6 +53,7 @@ your-folder/
 │   documents.py              ← document library and RAG search
 │   generation.py             ← streaming chat completion
 │   model_manager.py          ← loading/unloading GGUF models
+│   downloader.py             ← model catalog + first-run download queue
 │   runtime.py                ← shared window reference
 │   skills.py                  ← file-based skills
 │   requirements.txt
@@ -60,9 +62,8 @@ your-folder/
 ├───chats/                   ← created automatically - one .json file per conversation
 │   └───_context_summaries/    ← rolling-summary cache for long conversations
 ├───documents/                ← created automatically - the shared document library
-├───models/                    ← your downloaded .gguf model files (see below)
-├───skills/
-│       anti-ai-slop.md         ← the built-in writing-style skill
+├───models/                    ← .gguf files (fetched by the in-app downloader)
+├───skills/                    ← bundled: anti-ai-slop, tutor-mode, explain-simply, clear-norwegian
 │
 └───static/
     │   index.html              ← page structure only
@@ -78,6 +79,7 @@ your-folder/
             documents.js             ← document panel + library picker
             skills.js                ← right-panel skill switches
             settings.js               ← settings modal (all tabs)
+            setup.js                  ← first-run / model-download screen
             main.js                   ← startup
 ```
 
@@ -93,7 +95,7 @@ in a text editor, back it up, or delete it manually if needed.
 
 ## Installation
 
-### 1. Install Python dependencies
+### Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -113,43 +115,34 @@ pip install llama-cpp-python --prefer-binary --extra-index-url https://abetlen.g
 pip install pywebview numpy
 ```
 
-### 2. Create the `models` folder
-
-```bash
-mkdir models
-```
-
-Download the model files (see below) and place them there.
-
 ---
 
-## Models you need
+## Models
 
-All are GGUF files (quantized models optimized for CPU via `llama.cpp`).
-**Models are discovered automatically** — the app scans `models/*.gguf`
-on startup, so any file you drop in there shows up in the model picker
-(and in Settings) the next time you launch. No code editing required.
+**You don't download models by hand.** The first time the app starts with
+no models installed, it shows a **download screen** that fetches them from
+Hugging Face with progress and speed, and won't let you into the app until
+enough is in place. The same screen is reachable later from
+**Settings → Modeller → "+ Last ned modeller"**.
 
-| Model | Purpose |
+Four pieces are expected:
+
+| Piece | What it is |
 |---|---|
-| **Qwen2.5-1.5B-Instruct** | Fast, simple chat (best in English); doubles as the background model for document summaries and conversation compression when it's your smallest active model |
-| **Qwen2.5-7B-Instruct** | Main model — best at Norwegian |
-| **DeepSeek-R1-Distill-Qwen-7B-Uncensored** | Reasoning/math/logic (English recommended — see limitations below) |
-| **nomic-embed-text-v1.5** | Required for document search (RAG). Not a chat model, and won't appear in the model picker — the app uses it internally |
+| **nomic-embed-text v1.5** | Required for document search (RAG). Not a chat model — used internally |
+| **Qwen2.5 1.5B Instruct** | Fast chat; also the background model for document summaries and conversation compression |
+| **Main 7B model** | Qwen2.5-7B-Instruct — you pick the quant: `Q4_K_M` (~4.7 GB, recommended), `Q5_K_M`, or `Q6_K` |
+| **Reasoning model** | DeepSeek-R1-Distill-Qwen-7B-Uncensored — pick `Q4_K_M`, `Q5_K_M` (recommended), or `Q6_K` |
 
-Download sources (grab a `Q4_K_M` quant for the Qwens and `Q5_K_M` for
-DeepSeek unless you have a reason to pick another):
-- Qwen2.5-1.5B: `https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF` — single-file quants
-- Qwen2.5-7B: `https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF` — **use this, not the official `Qwen/Qwen2.5-7B-Instruct-GGUF` repo**, which only ships 2-shard split files (`…-00001-of-00002.gguf` + `…-00002-of-00002.gguf`). The app scans every `.gguf` separately, so a split model shows up as two broken half-entries in the picker
-- DeepSeek-R1 uncensored: `https://huggingface.co/mradermacher/DeepSeek-R1-Distill-Qwen-7B-Uncensored-i1-GGUF`
-- nomic-embed: `https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF`
+The embedder and 1.5B are fixed; for the two 7B slots you choose the size
+that fits the machine's RAM. The download screen also lists a few optional
+extras (a 0.5B, a 3B, Llama 3.2 3B, Qwen2.5-Coder 7B). The catalog lives in
+`downloader.py` if you want to add or change entries.
 
-The embedding model's filename must stay
-`nomic-embed-text-v1.5.Q4_K_M.gguf` (or you'll need to update the path
-in `config.py`) — every other `.gguf` file you add is picked up
-automatically under whatever name it has. If you do end up with a split
-model, merge the shards into one file first with llama.cpp's
-`llama-gguf-split --merge`.
+Everything is downloaded as a single-file GGUF into `models/`. Files are
+still **discovered automatically** — anything you drop into `models/`
+yourself also shows up. Resumable: an interrupted download continues from
+where it stopped (`.part` file).
 
 ---
 
@@ -307,6 +300,10 @@ folder. The panel re-reads `skills/` every few seconds and when the
 window regains focus, so new files show up without a restart; the ↻
 button forces an immediate refresh.
 
+Four are bundled (all off by default): `anti-ai-slop` (writing style),
+`tutor-mode` (guide instead of answering), `explain-simply`, and
+`clear-norwegian` (proofreading).
+
 ### Formatting
 
 Replies are rendered as markdown via `marked.js` (runs entirely
@@ -439,7 +436,8 @@ each generated text chunk, triggering `onChunk()` on the page instantly.
 | Module | Owns |
 |---|---|
 | `config.py` | Reading/writing `config.json`, scanning `models/` for `.gguf` files |
-| `model_manager.py` | Loading/unloading Llama instances, the embedder |
+| `model_manager.py` | Loading/unloading Llama instances, the embedder, the free-RAM check |
+| `downloader.py` | The downloadable-model catalog and the background download queue (resumable, progress events) |
 | `chat_store.py` | Raw chat JSON file I/O (used by both `chats.py` and `documents.py`) |
 | `chats.py` | Chat CRUD, context building, rolling-summary compression |
 | `documents.py` | The document library, chunking/embedding, attach/detach, RAG retrieval |
@@ -526,3 +524,9 @@ Re-add anything you need.
   of fixed values in `documents.py`
 - A real filesystem watcher for `skills/` instead of the current
   few-second poll
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

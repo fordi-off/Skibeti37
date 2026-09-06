@@ -7,12 +7,34 @@ import json
 import chats
 import config
 import documents
+import downloader
 import generation
 import model_manager
 import skills
 
 
 class Api:
+    # ---------------- Model downloads ----------------
+
+    def model_catalog(self):
+        return downloader.catalog_with_status()
+
+    def setup_status(self):
+        """{missing_slots, can_use_app} - drives the first-run download screen."""
+        return {
+            "missing_slots": downloader.missing_slots(),
+            "can_use_app": downloader.can_use_app(),
+        }
+
+    def start_model_downloads(self, ids_json):
+        return downloader.start(json.loads(ids_json))
+
+    def cancel_model_downloads(self):
+        return downloader.cancel()
+
+    def download_state(self):
+        return downloader.state()
+
     # ---------------- Models ----------------
 
     def list_models(self):
