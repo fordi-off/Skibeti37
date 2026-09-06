@@ -5,11 +5,15 @@ per-folder work sessions (name + task/summary history)."""
 
 import json
 import os
+import re
+import threading
 import time
 import uuid
 
 import webview
 
+import config
+import model_manager
 import runtime
 
 MAX_TEXT_FILES = 20
@@ -170,26 +174,34 @@ def _manifest(files):
 
 
 PLAN_SYS = (
-    "You are planning a small coding change for a student, on a weak computer. "
-    "You are given the current project files and a task. Produce a SHORT "
-    "implementation plan: a bullet list of the files to create, modify or "
-    "delete, one line each on what goes in it, plus any key decision. No code. "
-    "Do only what the task asks - do not over-engineer. Write the plan in the "
-    "same language as the task."
+    "You are the planner for a small coding task on a weak computer. You get "
+    "the current project files and a task. Write a SHORT plan as a plain bullet "
+    "list: which files to create, change or delete, one line each on what goes "
+    "in it, plus any key decision.\n"
+    "STRICT RULES:\n"
+    "- Absolutely NO code and NO code blocks. Words only.\n"
+    "- Write the ENTIRE plan in the SAME LANGUAGE as the task. Do not switch "
+    "languages, not even for a single word.\n"
+    "- Do only what the task asks. Do not over-engineer. You may propose new "
+    "files and new folders."
 )
 
 CODE_SYS = (
-    "Implement the plan for the student's project. Rules:\n"
+    "You implement the plan for the student's project. Rules:\n"
     "- Output EVERY new or changed file in full, each as its own fenced code "
     "block whose FIRST line inside the block is exactly `FILE: <relative/path>`.\n"
+    "- You MAY create new files and new folders - just give the new relative "
+    "path in the FILE: line (e.g. `FILE: js/klokke.js`).\n"
     "- Whole files only. No placeholders, no `...`, no `// unchanged`.\n"
     "- Only include files you actually change. Never rewrite a file marked "
     "'innhold utelatt' or 'binær'.\n"
     "- To delete a file, put a line `DELETE: <relative/path>` on its own, "
     "outside any code block.\n"
-    "- After the code blocks, add a section headed `Endringer:` in the task's "
-    "language - a few sentences on what you changed and how to try it (which "
-    "file to open, or which command to run). No code in that section."
+    "- After the code blocks, add a section headed `Endringer:` - a few "
+    "sentences on what you changed and how to try it (which file to open, or "
+    "which command to run). No code there.\n"
+    "- Any code comments AND the `Endringer:` text must be in the SAME LANGUAGE "
+    "as the task. Do not mix languages."
 )
 
 
@@ -210,6 +222,95 @@ def code_messages(task, plan, hist):
         {"role": "user",
          "content": f"Prosjektfiler:\n\n{_manifest(files)}\n\n---\n\nOppgave:\n{task}\n\n---\n\nPlan:\n{plan}"}
     ]
+
+
+# ---------------- two-pass runner (plan model -> code model) ----------------
+
+_stop = threading.Event()
+_PLAN_SAMPLING = {"temperature": 0.4, "repeat_penalty": 1.1, "frequency_penalty": 0.0}
+_CODE_SAMPLING = {"temperature": 0.2, "repeat_penalty": 1.05, "frequency_penalty": 0.0}
+_CONTINUE = "Fortsett nøyaktig der du slapp. Ikke gjenta noe. Ingen innledning."
+
+
+def _emit(fn, *args):
+    payload = ", ".join(json.dumps(a) for a in args)
+    runtime.window.evaluate_js(f"{fn}({payload})")
+
+
+def _strip_code(text):
+    text = re.sub(r"```[\s\S]*?```", "", text)
+    text = re.sub(r"(?m)^(?:    |\t).*$", "", text)   # drop indented (code-looking) lines
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _stream_once(model_name, messages, sampling, max_tokens):
+    llm = model_manager.ensure_only_model_loaded(model_name)
+    parts, truncated = [], False
+    stream = llm.create_chat_completion(
+        messages=messages, max_tokens=max_tokens, stream=True, **sampling
+    )
+    for chunk in stream:
+        if _stop.is_set():
+            break
+        choice = chunk["choices"][0]
+        delta = choice["delta"].get("content", "")
+        if delta:
+            parts.append(delta)
+            _emit("onCodeChunk", delta)
+        if choice.get("finish_reason") == "length":
+            truncated = True
+    return "".join(parts), truncated
+
+
+def stop():
+    _stop.set()
+    return {"stopping": True}
+
+
+def run_task(code_model, task, history):
+    _stop.clear()
+    threading.Thread(target=_run_task, args=(code_model, task, history or []), daemon=True).start()
+    return {"started": True}
+
+
+def _run_task(code_model, task, history):
+    try:
+        plan_model = config.get_utility_model_filename() or code_model
+
+        _emit("onCodePhase", "plan")
+        _emit("onCodeStatus", "lager plan…" if model_manager.is_loaded(plan_model) else "laster planmodell…")
+        plan, _ = _stream_once(plan_model, plan_messages(task, history), _PLAN_SAMPLING, 700)
+        plan = _strip_code(plan) or "(ingen plan)"
+        _emit("onCodePlan", plan)
+        if _stop.is_set():
+            _emit("onCodeDone", {"stopped": True, "plan": plan})
+            return
+
+        _emit("onCodePhase", "code")
+        _emit("onCodeStatus", "skriver kode…" if model_manager.is_loaded(code_model) else "laster kodemodell…")
+        _, truncated = _stream_once(code_model, code_messages(task, plan, history), _CODE_SAMPLING, 4000)
+        _emit("onCodeDone", {"truncated": truncated, "stopped": _stop.is_set(), "plan": plan})
+    except Exception as e:
+        _emit("onCodeError", str(e))
+
+
+def continue_code(code_model, task, plan, history, partial):
+    _stop.clear()
+    msgs = code_messages(task, plan, history or [])
+    msgs.append({"role": "assistant", "content": partial})
+    msgs.append({"role": "user", "content": _CONTINUE})
+
+    def go():
+        try:
+            _emit("onCodePhase", "code")
+            _emit("onCodeStatus", "fortsetter…")
+            _, truncated = _stream_once(code_model, msgs, _CODE_SAMPLING, 4000)
+            _emit("onCodeDone", {"truncated": truncated, "stopped": _stop.is_set(), "plan": plan, "append": True})
+        except Exception as e:
+            _emit("onCodeError", str(e))
+
+    threading.Thread(target=go, daemon=True).start()
+    return {"started": True}
 
 
 def _inside(root_abs, target):

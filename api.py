@@ -23,22 +23,17 @@ class Api:
     def code_read_project(self):
         return coding.read_project()
 
-    def code_plan(self, model_name, task, history_json):
-        return generation.code_stream(model_name, coding.plan_messages(task, json.loads(history_json)))
+    def code_run(self, model_name, task, history_json):
+        return coding.run_task(model_name, task, json.loads(history_json))
 
-    def code_generate(self, model_name, task, plan, history_json):
-        return generation.code_stream(model_name, coding.code_messages(task, plan, json.loads(history_json)))
-
-    def code_generate_continue(self, model_name, task, plan, history_json, partial):
-        msgs = coding.code_messages(task, plan, json.loads(history_json))
-        msgs.append({"role": "assistant", "content": partial})
-        return generation.code_stream(model_name, msgs, continuation=True)
+    def code_continue(self, model_name, task, plan, history_json, partial):
+        return coding.continue_code(model_name, task, plan, json.loads(history_json), partial)
 
     def code_apply(self, changes_json, deletions_json):
         return coding.apply_changes(json.loads(changes_json), json.loads(deletions_json))
 
     def code_cancel(self):
-        return generation.stop()
+        return coding.stop()
 
     def code_set_folder(self, path):
         return coding.set_folder(path)

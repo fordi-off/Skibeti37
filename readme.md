@@ -346,12 +346,17 @@ runs anything — it only proposes file contents, and you apply each change.
    `.git`, `node_modules`, etc.; files over ~8 KB are listed but their
    contents aren't sent; a project over ~20 files / ~48 KB of text is
    refused as too big for local models).
-2. Type a task → **Lag plan**. A first pass produces a short plan (which
-   files to add/change/delete) that lands in an **editable box** — fix or
-   trim it.
-3. **Skriv koden** — a second pass (same model) writes every changed file
-   in full. The result is parsed into a **diff view**: `NY` / `ENDRET` /
-   `SLETT` per file, plus a **"Hva modellen gjorde"** summary.
+2. Type a task and press **Enter** (or **Kjør**). It runs in two passes,
+   automatically:
+   - **Plan** — the small background model (Qwen 1.5B) writes a short
+     plan, shown as a collapsible block you watch stream. No code, and
+     it's told to stay in the task's language.
+   - **Kode** — the model picked in the header (use a Coder model) reads
+     that plan and writes every new or changed file in full, then an
+     `Endringer:` summary. It may create new files and folders.
+3. The result is a **diff view**: `NY` / `ENDRET` / `SLETT` per file,
+   with the **"Hva modellen gjorde"** summary and the collapsed plan on
+   top.
 4. **Bruk endringer** — writes the checked files (deletions ask again
    first). All writes are confined to the chosen folder. Then type a
    follow-up task; the last few tasks + summaries are kept as context.
@@ -361,10 +366,11 @@ The left column has **Økter** above the file tree: each work session
 reopens with the folder restored. `+ Ny` starts a fresh one; double-click
 a name to rename, `×` to delete (the folder's files are untouched).
 
-If the output is cut off, a **Fortsett svaret** button finishes it before
-you apply. Use the **Kodemodell** slot in the setup screen to install
-Qwen2.5-Coder-7B, and keep projects small — a 3-file change is a few
-minutes on a school CPU; anything large gets slow and unreliable.
+If the code pass is cut off, a **Fortsett svaret** button finishes it
+before you apply. Install Qwen2.5-Coder-7B from the **Kodemodell** slot
+in the setup screen and pick it in the header. Keep projects small — a
+3-file change is a few minutes on a school CPU; anything large gets slow
+and unreliable.
 
 ---
 

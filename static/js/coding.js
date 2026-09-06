@@ -3,14 +3,15 @@
 // writes full files -> diff view -> you apply. No commands are ever run.
 
 let codeProject = null;                 // last read_project() result
-let codeState = "idle";                 // idle | planning | plan | generating | diff
+let codeState = "idle";                 // idle | running | diff
+let codePhase = "";                     // plan | code  (while running)
 let codeSession = { id: null, name: null, folder: null, history: [] };  // task/summary log
 let codeTask = "";
-let codePlanText = "";
-let codeRaw = "";
+let codePlan = "";
+let codeRaw = "";                        // accumulated code-pass output
 let codeParsed = null;
 
-const codeBusy = () => codeState === "planning" || codeState === "generating";
+const codeBusy = () => codeState === "running";
 
 const codeViewEl = () => document.getElementById("code-view");
 function renderCodeView(html) { codeViewEl().innerHTML = html; }
@@ -190,7 +191,7 @@ function renderCodeTree() {
 }
 
 function codeShowFile(rel) {
-  if (codeState === "planning" || codeState === "generating") return;
+  if (codeBusy()) return;
   const f = (codeProject.files || []).find(x => x.rel === rel);
   if (!f) return;
   if (!f.text) { renderCodeView(`<div class="code-hint">${esc(rel)} — binærfil, vises ikke.</div>`); return; }
@@ -201,87 +202,107 @@ function codeShowFile(rel) {
 
 function codeSetButtons(state) {
   const show = (id, on) => document.getElementById(id).classList.toggle("hidden", !on);
-  const busy = state === "planning" || state === "generating";
+  const busy = state === "running";
   const haveFolder = !!(codeProject && codeProject.path);
-  show("code-plan-btn", (state === "idle" || state === "plan"));
-  show("code-gen-btn", state === "plan");
+  show("code-run-btn", state === "idle");
   show("code-apply-btn", state === "diff");
   show("code-cancel-btn", busy);
-  document.getElementById("code-plan-btn").disabled = !haveFolder;
-  document.getElementById("code-plan-btn").textContent = state === "plan" ? "Lag ny plan" : "Lag plan";
+  document.getElementById("code-run-btn").disabled = !haveFolder;
   document.getElementById("code-task").disabled = busy;
   document.getElementById("code-pick-btn").disabled = busy;
+  document.getElementById("code-new-session").disabled = busy;
 }
 
-async function codeRunPlan() {
+// One action: plan (1.5B) -> code (selected model) -> diff. No buttons in between.
+async function codeRun() {
   const task = document.getElementById("code-task").value.trim();
-  if (!task || !currentModel || !(codeProject && codeProject.path)) return;
+  if (!task || !currentModel || !(codeProject && codeProject.path) || codeBusy()) return;
   codeTask = task;
+  codePlan = "";
   codeRaw = "";
-  codeState = "planning";
-  codeSetButtons("planning");
+  codePhase = "plan";
+  codeState = "running";
+  codeSetButtons("running");
   codeStatus("lager plan…");
-  renderCodeView(`<div class="code-live-md"></div>`);
+  renderCodeView(planBlockHTML(true, "") + `<pre class="code-live hidden"></pre>`);
   try {
-    await window.pywebview.api.code_plan(currentModel, task, JSON.stringify(codeSession.history));
+    await window.pywebview.api.code_run(currentModel, task, JSON.stringify(codeSession.history));
   } catch (e) { onCodeError(String(e)); }
 }
 
-async function codeRunGenerate(cont) {
-  const prevRaw = codeRaw;
-  if (!cont) codeRaw = "";
-  codeState = "generating";
-  codeSetButtons("generating");
-  codeStatus("skriver kode…");
-  renderCodeView(`<pre class="code-live">${esc(codeRaw)}</pre>`);
+async function codeContinue() {
+  if (codeBusy()) return;
+  codePhase = "code";
+  codeState = "running";
+  codeSetButtons("running");
+  codeStatus("fortsetter…");
+  renderCodeView(planBlockHTML(false, codePlan) + `<pre class="code-live"></pre>`);
+  codeViewEl().querySelector(".code-live").textContent = codeRaw;
   try {
-    if (cont) {
-      await window.pywebview.api.code_generate_continue(
-        currentModel, codeTask, codePlanText, JSON.stringify(codeSession.history), prevRaw);
-    } else {
-      await window.pywebview.api.code_generate(
-        currentModel, codeTask, codePlanText, JSON.stringify(codeSession.history));
-    }
+    await window.pywebview.api.code_continue(
+      currentModel, codeTask, codePlan, JSON.stringify(codeSession.history), codeRaw);
   } catch (e) { onCodeError(String(e)); }
+}
+
+function planBlockHTML(open, text) {
+  return `<details class="thinking-block"${open ? " open" : ""}>
+    <summary>Plan</summary>
+    <div class="thinking-body">${text ? formatInline(text) : ""}</div>
+  </details>`;
 }
 
 // ---- streaming callbacks from Python ----
 
 function onCodePhase(phase) {
-  if (phase === "loading") codeStatus(`laster ${modelLabels[currentModel] || currentModel}…`);
-  else codeStatus(codeState === "planning" ? "lager plan…" : "skriver kode…");
+  codePhase = phase;
+  if (phase === "code") {
+    // collapse the plan block, reveal the code stream area
+    const d = codeViewEl().querySelector("details.thinking-block");
+    if (d) d.open = false;
+    const pre = codeViewEl().querySelector(".code-live");
+    if (pre) { pre.classList.remove("hidden"); pre.textContent = ""; }
+    codeRaw = "";
+  }
 }
 
+function onCodeStatus(t) { codeStatus(t); }
+
 function onCodeChunk(delta) {
-  codeRaw += delta;
-  if (codeState === "planning") {
-    renderCodeView(`<div class="code-live-md">${formatInline(codeRaw)}</div>`);
-  } else if (codeState === "generating") {
+  if (codePhase === "plan") {
+    codePlan += delta;
+    const body = codeViewEl().querySelector("details.thinking-block .thinking-body");
+    if (body) body.textContent = codePlan;
+  } else {
+    codeRaw += delta;
     let pre = codeViewEl().querySelector(".code-live");
-    if (!pre) { renderCodeView(`<pre class="code-live"></pre>`); pre = codeViewEl().querySelector(".code-live"); }
+    if (!pre) { renderCodeView(planBlockHTML(false, codePlan) + `<pre class="code-live"></pre>`); pre = codeViewEl().querySelector(".code-live"); }
     pre.textContent = codeRaw;
   }
   codeViewEl().scrollTop = codeViewEl().scrollHeight;
 }
 
+function onCodePlan(text) {
+  codePlan = (text || "").trim();
+  const body = codeViewEl().querySelector("details.thinking-block .thinking-body");
+  if (body) body.innerHTML = formatInline(codePlan);
+}
+
 function onCodeDone(info) {
   codeStatus("");
   document.getElementById("code-cancel-btn").classList.add("hidden");
+  if (info && info.plan) codePlan = info.plan;
 
-  if (codeState === "planning") {
-    codeState = "plan";
-    renderCodeView(`<div class="code-plan-wrap"><label>Plan — rediger fritt før du genererer:</label><textarea id="code-plan-edit"></textarea></div>`);
-    const ta = document.getElementById("code-plan-edit");
-    ta.value = codeRaw.trim();
-    autoGrow(ta, 420);
-    ta.addEventListener("input", () => autoGrow(ta, 420));
-    codeSetButtons("plan");
-  } else if (codeState === "generating") {
-    codeState = "diff";
-    codeParsed = parseCodeResponse(codeRaw);
-    codeParsed.truncated = !!(info && (info.truncated || info.stopped));
-    renderCodeDiff();
+  if (info && info.stopped && !codeRaw.trim()) {
+    codeState = "idle";
+    renderCodeView(planBlockHTML(false, codePlan) + `<div class="code-hint">Stoppet.</div>`);
+    codeSetButtons("idle");
+    return;
   }
+
+  codeState = "diff";
+  codeParsed = parseCodeResponse(codeRaw);
+  codeParsed.truncated = !!(info && (info.truncated || info.stopped));
+  renderCodeDiff();
 }
 
 function onCodeError(msg) {
@@ -364,7 +385,7 @@ function renderCodeDiff() {
   const cur = {};
   (codeProject.files || []).forEach(f => { cur[f.rel] = f.content; });
 
-  let html = "";
+  let html = planBlockHTML(false, codePlan);
   if (p.summary) html += `<div class="code-summary"><h4>Hva modellen gjorde</h4>${formatInline(p.summary)}</div>`;
   if (p.truncated || p.truncatedBlock) {
     html += `<div class="code-warn">Svaret ble kuttet av lengdegrensen — trykk «Fortsett svaret» for resten før du bruker endringene.</div>`;
@@ -410,7 +431,7 @@ function renderCodeDiff() {
 
   renderCodeView(html);
   const cont = document.getElementById("code-continue-btn");
-  if (cont) cont.onclick = () => codeRunGenerate(true);
+  if (cont) cont.onclick = codeContinue;
   codeSetButtons("diff");
 }
 
@@ -467,7 +488,9 @@ document.getElementById("code-btn").onclick = openCode;
 document.getElementById("code-close-btn").onclick = closeCode;
 document.getElementById("code-new-session").onclick = newCodeSession;
 document.getElementById("code-pick-btn").onclick = codePickFolder;
-document.getElementById("code-plan-btn").onclick = codeRunPlan;
-document.getElementById("code-gen-btn").onclick = () => { codePlanText = (document.getElementById("code-plan-edit") || {}).value || codeRaw; codeRunGenerate(false); };
+document.getElementById("code-run-btn").onclick = codeRun;
 document.getElementById("code-apply-btn").onclick = codeApply;
 document.getElementById("code-cancel-btn").onclick = () => window.pywebview.api.code_cancel();
+document.getElementById("code-task").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); codeRun(); }
+});
