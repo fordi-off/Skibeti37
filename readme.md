@@ -119,30 +119,29 @@ pip install pywebview numpy
 
 ## Models
 
-**You don't download models by hand.** The first time the app starts with
-no models installed, it shows a **download screen** that fetches them from
-Hugging Face with progress and speed, and won't let you into the app until
-enough is in place. The same screen is reachable later from
-**Settings → Modeller → "+ Last ned modeller"**.
+**You don't download models by hand.** The first time the app starts
+without the base models, the chat area shows a small **"Kom i gang"**
+panel:
 
-Four pieces are expected:
+- **nomic-embed-text v1.5** (document search) and **Qwen2.5 1.5B**
+  (fast chat + the background model for summaries/compression) download
+  automatically — no choice.
+- **Hovedmodell** — pick a size for the normal chat model: Qwen2.5
+  **3B**, **7B** (default), or **14B**, or "Ingen".
+- **Resonneringsmodell** — pick a size for matte/logikk: DeepSeek-R1
+  Distill **7B** (default, uncensored) or **14B**, or "Ingen".
+- **Hopp over** downloads only the two automatic files and drops you
+  into the app; add your own `.gguf` files to `models/` whenever.
 
-| Piece | What it is |
-|---|---|
-| **nomic-embed-text v1.5** | Required for document search (RAG). Not a chat model — used internally |
-| **Qwen2.5 1.5B Instruct** | Fast chat; also the background model for document summaries and conversation compression |
-| **Main 7B model** | Qwen2.5-7B-Instruct — you pick the quant: `Q4_K_M` (~4.7 GB, recommended), `Q5_K_M`, or `Q6_K` |
-| **Reasoning model** | DeepSeek-R1-Distill-Qwen-7B-Uncensored — pick `Q4_K_M`, `Q5_K_M` (recommended), or `Q6_K` |
+Downloads run one at a time with a live progress bar, speed and ETA, and
+resume from where they stopped (`.part` file) if interrupted. The panel is
+also reachable later from **Settings → Modeller → "+ Last ned modeller"**.
+The catalog (URLs, sizes, quants) lives in `downloader.py`.
 
-The embedder and 1.5B are fixed; for the two 7B slots you choose the size
-that fits the machine's RAM. The download screen also lists a few optional
-extras (a 0.5B, a 3B, Llama 3.2 3B, Qwen2.5-Coder 7B). The catalog lives in
-`downloader.py` if you want to add or change entries.
-
-Everything is downloaded as a single-file GGUF into `models/`. Files are
-still **discovered automatically** — anything you drop into `models/`
-yourself also shows up. Resumable: an interrupted download continues from
-where it stopped (`.part` file).
+Everything lands as a single-file GGUF in `models/` and is still
+**discovered automatically** — anything you drop in yourself shows up too.
+Downloading a different size does **not** remove the old one; delete the
+`.gguf` from `models/` if you want the space back.
 
 ---
 
@@ -195,7 +194,8 @@ whether they run on CPU or GPU are all configured in **Settings**. The
 last model you picked is remembered and pre-selected on the next launch.
 
 If `models/` has no `.gguf` files, the dropdown and input are disabled
-and the chat area says so — drop model files in and restart.
+and the chat area shows a **"Last ned modeller"** button that opens the
+download panel.
 
 ### Writing a message
 

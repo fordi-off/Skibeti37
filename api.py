@@ -20,11 +20,8 @@ class Api:
         return downloader.catalog_with_status()
 
     def setup_status(self):
-        """{missing_slots, can_use_app} - drives the first-run download screen."""
-        return {
-            "missing_slots": downloader.missing_slots(),
-            "can_use_app": downloader.can_use_app(),
-        }
+        """{needs_setup} - true while the always-required models aren't in place."""
+        return {"needs_setup": downloader.needs_setup()}
 
     def start_model_downloads(self, ids_json):
         return downloader.start(json.loads(ids_json))

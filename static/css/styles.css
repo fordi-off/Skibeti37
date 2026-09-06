@@ -806,107 +806,54 @@
   }
   .confirm-danger-btn:hover { filter: brightness(1.08); }
 
-  /* ---------- Model downloader ---------- */
+  /* ---------- First-run model setup (inline in #chat) ---------- */
 
-  #setup-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--paper);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 300;
-  }
-  #setup-overlay.hidden { display: none; }
-
-  #setup-modal {
-    width: 620px;
-    max-width: 94vw;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-  }
-
-  .setup-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px;
-    border-bottom: 1px solid var(--line);
-  }
-  .setup-header h2 {
+  .setup-panel { max-width: 520px; margin: 20px auto; font-size: 14px; }
+  .setup-panel h2 {
     font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
-    font-size: 18px;
-    margin: 0;
+    font-size: 21px;
+    margin: 0 0 10px;
   }
+  .setup-panel p { color: var(--ink-soft); line-height: 1.6; margin: 0 0 20px; }
+  .setup-panel code { font-size: 12.5px; }
 
-  .setup-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
-  #setup-intro { margin: 0 0 16px; font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
-
-  .setup-group { margin-bottom: 18px; }
-  .setup-group h3 {
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--ink-soft);
+  .setup-panel label {
+    display: block;
+    font-size: 12px;
     font-weight: 600;
-    margin: 0 0 8px;
-  }
-  .setup-installed-note { font-size: 12px; color: var(--accent); margin-bottom: 8px; }
-
-  .setup-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .setup-row:hover { background: var(--paper-raised); }
-  .setup-row.installed { cursor: default; opacity: 0.65; }
-  .setup-row-ctrl {
-    flex-shrink: 0;
-    width: 18px;
-    text-align: center;
-    color: var(--accent);
-    padding-top: 1px;
-  }
-  .setup-row-ctrl input { accent-color: var(--accent); }
-  .setup-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .setup-row-name { font-weight: 500; }
-  .setup-row-note { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; }
-  .setup-row-size {
-    flex-shrink: 0;
-    font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace;
-    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
     color: var(--ink-soft);
-    padding-top: 1px;
+    margin-bottom: 14px;
   }
+  .setup-panel select {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    background: white;
+    color: var(--ink);
+  }
+  .setup-panel select:focus { outline: none; border-color: var(--accent); }
 
-  .setup-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 22px;
-    border-top: 1px solid var(--line);
-    background: var(--sidebar);
+  .setup-panel-total {
+    font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 4px 0 18px;
   }
-  #setup-total { font-size: 12.5px; color: var(--ink-soft); font-family: Consolas, monospace; }
-  .setup-footer-btns { display: flex; gap: 8px; }
+  .setup-panel-btns { display: flex; gap: 10px; }
 
   .setup-primary {
     background: var(--accent);
     color: white;
     border: none;
     border-radius: 8px;
-    padding: 9px 18px;
+    padding: 10px 20px;
     font-family: inherit;
     font-size: 13px;
     font-weight: 500;
@@ -914,42 +861,35 @@
   }
   .setup-primary:hover { filter: brightness(1.05); }
   .setup-primary:disabled { opacity: 0.4; cursor: default; }
-
-  #setup-progress .setup-current-name { font-size: 13px; font-weight: 500; margin: 18px 0 6px; }
-  #setup-progress .setup-line {
-    font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace;
-    font-size: 11.5px;
+  .setup-panel-btns button:not(.setup-primary):not(.confirm-danger-btn) {
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 13px;
     color: var(--ink-soft);
-    margin-top: 5px;
+    cursor: pointer;
   }
+  .setup-panel-btns button:not(.setup-primary):hover { border-color: var(--ink-soft); color: var(--ink); }
 
   .setup-bar {
     height: 8px;
     background: var(--paper-raised);
     border-radius: 4px;
     overflow: hidden;
+    margin: 8px 0;
   }
-  .setup-bar-fill {
-    height: 100%;
-    width: 0%;
-    background: var(--accent);
-    transition: width 0.25s;
-  }
+  .setup-bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.25s; }
+  .setup-line { font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace; font-size: 11.5px; color: var(--ink-soft); }
+  .setup-current-name { font-weight: 500; margin-top: 18px; }
 
-  #setup-list { margin-top: 18px; display: flex; flex-direction: column; gap: 4px; }
-  .setup-list-row {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    font-size: 12px;
-    padding: 4px 6px;
-    border-radius: 5px;
-  }
+  .setup-list { margin: 16px 0 18px; display: flex; flex-direction: column; gap: 4px; }
+  .setup-list-row { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 3px 4px; }
   .setup-list-row .m { width: 14px; text-align: center; flex-shrink: 0; }
-  .setup-list-row .n { flex: 1; min-width: 0; }
-  .setup-list-row.ok .m { color: var(--accent); }
   .setup-list-row.ok { color: var(--ink-soft); }
+  .setup-list-row.ok .m { color: var(--accent); }
   .setup-list-row.fail .m { color: var(--danger); }
-  .setup-list-row.cur { background: var(--accent-soft); font-weight: 500; }
+  .setup-list-row.cur { font-weight: 500; }
   .setup-list-row.queued { color: var(--ink-soft); }
   .setup-list-err { font-size: 11px; color: var(--danger); }

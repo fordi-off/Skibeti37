@@ -29,7 +29,7 @@ document.querySelectorAll(".settings-tab").forEach(tab => {
 
 document.getElementById("settings-download-btn").onclick = () => {
   settingsOverlayEl.classList.add("hidden");
-  showSetup({ firstRun: false });
+  renderSetupPanel();
 };
 
 async function refreshSettingsModelList() {

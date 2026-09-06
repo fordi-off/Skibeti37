@@ -8,9 +8,9 @@ async function startupLoad() {
 }
 
 window.addEventListener("pywebviewready", async () => {
-  const status = await window.pywebview.api.setup_status();
-  if (status.missing_slots.length) {
-    showSetup({ firstRun: true, status });   // blocks the app until models are in place
+  const { needs_setup } = await window.pywebview.api.setup_status();
+  if (needs_setup) {
+    renderSetupPanel();          // shows in the chat area until the base models are downloaded
   } else {
     await startupLoad();
   }

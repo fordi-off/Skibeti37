@@ -1,24 +1,12 @@
-// ---------------- Model downloader ----------------
-// First-run screen + "download more models" dialog. While it's shown the
-// rest of the app is covered and unusable; during an active download there's
-// no way out until it finishes, is cancelled, or errors.
-
-const setupOverlayEl = document.getElementById("setup-overlay");
-const setupChooseEl = document.getElementById("setup-choose");
-const setupProgressEl = document.getElementById("setup-progress");
-const setupGroupsEl = document.getElementById("setup-groups");
-const setupIntroEl = document.getElementById("setup-intro");
-const setupTotalEl = document.getElementById("setup-total");
-const setupTitleEl = document.getElementById("setup-title");
-const setupDownloadBtn = document.getElementById("setup-download-btn");
-const setupCancelBtn = document.getElementById("setup-cancel-btn");
-const setupProceedBtn = document.getElementById("setup-proceed-btn");
-const setupCloseBtn = document.getElementById("setup-close-btn");
+// ---------------- First-run model setup (inline in the chat area) ----------------
+// The embedder + Qwen 1.5B always download. The user picks a size for the
+// main and reasoning models, or skips and adds .gguf files themselves.
+// Everything renders inside #chat; while a download runs the composer is
+// disabled (there's no model yet anyway).
 
 let setupCatalog = [];
-let setupFirstRun = false;
-let setupCanProceed = false;
 let dlPlannedIds = [];
+let setupBusy = false;
 
 function fmtSize(bytes) {
   if (!bytes) return "?";
@@ -31,123 +19,78 @@ function fmtSpeed(bps) {
 function fmtEta(sec) {
   if (!sec || !isFinite(sec) || sec < 0) return "";
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);
-  return m ? `${m} min ${s} s` : `${s} s`;
+  return m ? `${m} min igjen` : `${s} s igjen`;
 }
 function phaseLabel(p) {
-  return { done: "ferdig", error: "med feil", cancelled: "avbrutt", running: "laster" }[p] || p;
+  return { done: "ferdig", error: "med feil", cancelled: "avbrutt" }[p] || "";
 }
 
-async function showSetup(opts) {
-  opts = opts || {};
-  setupFirstRun = !!opts.firstRun;
+async function renderSetupPanel() {
+  if (setupBusy) return;
   setupCatalog = await window.pywebview.api.model_catalog();
-  const status = opts.status || await window.pywebview.api.setup_status();
-  setupCanProceed = !!status.can_use_app;
 
-  setupChooseEl.classList.remove("hidden");
-  setupProgressEl.classList.add("hidden");
-  setupCancelBtn.classList.add("hidden");
-  setupDownloadBtn.classList.remove("hidden");
-  setupDownloadBtn.disabled = false;
-  setupDownloadBtn.onclick = startDownloads;
-  setupCloseBtn.classList.toggle("hidden", setupFirstRun);
-  setupProceedBtn.classList.toggle("hidden", !(setupFirstRun && setupCanProceed));
-  setupProceedBtn.textContent = "Fortsett til appen";
+  const opts = (role) => setupCatalog
+    .filter(e => e.role === role)
+    .map(e => `<option value="${e.id}" ${e.default ? "selected" : ""}${e.installed ? " disabled" : ""}>${e.size_label} — ${e.note}${e.installed ? " (installert)" : " · " + fmtSize(e.size_bytes)}</option>`)
+    .join("");
 
-  setupTitleEl.textContent = setupFirstRun ? "Velkommen — last ned modeller" : "Last ned modeller";
-  setupIntroEl.textContent = setupFirstRun
-    ? "Skibeti37 trenger noen modellfiler for å virke. De to øverste er nødvendige. For de to store modellene kan du velge kvalitet. Alt hentes fra Hugging Face."
-    : "Legg til flere modeller. Allerede installerte er merket.";
+  chatEl.innerHTML = `
+    <div class="setup-panel">
+      <h2>Kom i gang</h2>
+      <p>Skibeti37 laster ned dokumentmodellen og en liten chatmodell (Qwen 1.5B) uansett.
+         Velg hvor store de to hovedmodellene skal være, eller hopp over og legg til egne
+         <code>.gguf</code>-filer i <code>models/</code>.</p>
 
-  renderGroups();
-  setupOverlayEl.classList.remove("hidden");
+      <label>Hovedmodell (vanlig chat)
+        <select id="setup-main">${opts("main")}<option value="">Ingen — jeg legger til selv</option></select>
+      </label>
+      <label>Resonneringsmodell (matte / logikk)
+        <select id="setup-reason">${opts("reasoning")}<option value="">Ingen — jeg legger til selv</option></select>
+      </label>
+
+      <div class="setup-panel-total" id="setup-total"></div>
+      <div class="setup-panel-btns">
+        <button id="setup-skip">Hopp over</button>
+        <button id="setup-go" class="setup-primary">Last ned</button>
+      </div>
+    </div>`;
+
+  const mainSel = document.getElementById("setup-main");
+  const reasonSel = document.getElementById("setup-reason");
+  const totalEl = document.getElementById("setup-total");
+
+  const recalcTotal = () => {
+    const ids = ["embed", "utility", mainSel.value, reasonSel.value].filter(Boolean);
+    const bytes = ids.reduce((s, id) => {
+      const e = setupCatalog.find(x => x.id === id);
+      return s + (e && !e.installed ? (e.size_bytes || 0) : 0);
+    }, 0);
+    totalEl.textContent = `Å laste ned: ${fmtSize(bytes) === "0 MB" ? "ingenting nytt" : fmtSize(bytes)}`;
+  };
+  mainSel.addEventListener("change", recalcTotal);
+  reasonSel.addEventListener("change", recalcTotal);
+  recalcTotal();
+
+  document.getElementById("setup-go").onclick = () =>
+    startSetupDownload([mainSel.value, reasonSel.value].filter(Boolean));
+  document.getElementById("setup-skip").onclick = () => startSetupDownload([]);
 }
 
-function rowHTML(entry, controlHTML) {
-  const inst = entry.installed;
-  return `<label class="setup-row${inst ? " installed" : ""}">
-    <span class="setup-row-ctrl">${inst ? "✓" : controlHTML}</span>
-    <span class="setup-row-main">
-      <span class="setup-row-name">${entry.name}</span>
-      ${entry.note ? `<span class="setup-row-note">${entry.note}</span>` : ""}
-    </span>
-    <span class="setup-row-size">${inst ? "Installert" : fmtSize(entry.size_bytes)}</span>
-  </label>`;
-}
+async function startSetupDownload(chosenIds) {
+  dlPlannedIds = ["embed", "utility", ...chosenIds]
+    .filter((id, i, a) => a.indexOf(id) === i)
+    .filter(id => {
+      const e = setupCatalog.find(x => x.id === id);
+      return e && !e.installed;
+    });
 
-function renderGroups() {
-  const byRole = (r) => setupCatalog.filter(e => e.role === r);
-  let html = "";
+  setupBusy = true;
+  setSetupUiLocked(true);
 
-  const required = [...byRole("embed"), ...byRole("utility")];
-  html += `<div class="setup-group"><h3>Nødvendige</h3>` + required.map(e =>
-    rowHTML(e, `<input type="checkbox" data-model-id="${e.id}" checked disabled>`)
-  ).join("") + `</div>`;
+  if (!dlPlannedIds.length) { await finishSetup(); return; }
 
-  for (const [role, label] of [
-    ["main", "Hovedmodell — velg kvalitet"],
-    ["reasoning", "Resonneringsmodell — velg kvalitet"],
-  ]) {
-    const group = byRole(role);
-    const haveOne = group.find(e => e.installed);
-    html += `<div class="setup-group"><h3>${label}</h3>`;
-    if (haveOne) {
-      html += `<div class="setup-installed-note">✓ Installert: ${haveOne.display_name || haveOne.name}. Velg en annen kvalitet for å legge til.</div>`;
-    }
-    html += group.map(e => e.installed
-      ? rowHTML(e, "")
-      : rowHTML(e, `<input type="radio" name="setup-${role}" data-model-id="${e.id}" ${(!haveOne && e.default) ? "checked" : ""}>`)
-    ).join("") + `</div>`;
-  }
-
-  const extra = byRole("extra");
-  html += `<div class="setup-group"><h3>Flere modeller (valgfritt)</h3>` + extra.map(e =>
-    rowHTML(e, `<input type="checkbox" data-model-id="${e.id}" ${e.installed ? "checked disabled" : ""}>`)
-  ).join("") + `</div>`;
-
-  setupGroupsEl.innerHTML = html;
-  setupGroupsEl.querySelectorAll("input[data-model-id]").forEach(i => i.addEventListener("change", updateTotal));
-  updateTotal();
-}
-
-function collectSelected() {
-  const ids = [];
-  setupGroupsEl.querySelectorAll("input[data-model-id]").forEach(i => {
-    if (!i.checked) return;
-    const e = setupCatalog.find(x => x.id === i.dataset.modelId);
-    if (e && !e.installed) ids.push(e.id);
-  });
-  return ids;
-}
-
-function updateTotal() {
-  const ids = collectSelected();
-  dlPlannedIds = ids;
-  const bytes = ids.reduce((s, id) => {
-    const e = setupCatalog.find(x => x.id === id);
-    return s + (e ? (e.size_bytes || 0) : 0);
-  }, 0);
-  setupTotalEl.textContent = ids.length ? `Totalt: ${fmtSize(bytes)}` : "Ingenting valgt";
-  setupDownloadBtn.disabled = ids.length === 0;
-  setupDownloadBtn.textContent = ids.length ? `Last ned ${fmtSize(bytes)}` : "Last ned";
-}
-
-async function startDownloads() {
-  const ids = collectSelected();
-  if (!ids.length) return;
-  dlPlannedIds = ids;
-
-  setupChooseEl.classList.add("hidden");
-  setupProgressEl.classList.remove("hidden");
-  setupDownloadBtn.classList.add("hidden");
-  setupProceedBtn.classList.add("hidden");
-  setupCloseBtn.classList.add("hidden");
-  setupCancelBtn.classList.remove("hidden");
-  setupTotalEl.textContent = "";
-  setupTitleEl.textContent = "Laster ned…";
-
-  renderProgress({ phase: "running", queue: ids.slice(), current: null, completed: [], failed: [] });
-  await window.pywebview.api.start_model_downloads(JSON.stringify(ids));
+  renderProgress({ phase: "running", queue: dlPlannedIds.slice(), current: null, completed: [], failed: [] });
+  await window.pywebview.api.start_model_downloads(JSON.stringify(chosenIds));
 }
 
 // Called from Python as the queue advances.
@@ -164,62 +107,62 @@ function renderProgress(state) {
   }
   frac = Math.max(0, Math.min(1, frac));
 
-  document.getElementById("setup-overall").innerHTML =
-    `<div class="setup-bar"><div class="setup-bar-fill" style="width:${(frac * 100).toFixed(1)}%"></div></div>
-     <div class="setup-line">${finished} / ${total} filer${state.phase === "running" ? "" : " — " + phaseLabel(state.phase)}</div>`;
-
   const cur = state.current;
-  document.getElementById("setup-current").innerHTML = cur
-    ? `<div class="setup-current-name">${cur.name}</div>
-       <div class="setup-bar"><div class="setup-bar-fill" style="width:${cur.total ? (cur.downloaded / cur.total * 100).toFixed(1) : 0}%"></div></div>
-       <div class="setup-line">${fmtSize(cur.downloaded)} / ${fmtSize(cur.total)}${cur.speed ? " · " + fmtSpeed(cur.speed) : ""}${(cur.speed && cur.total) ? " · " + fmtEta((cur.total - cur.downloaded) / cur.speed) + " igjen" : ""}</div>`
-    : "";
+  const terminal = ["done", "error", "cancelled"].includes(state.phase);
 
-  document.getElementById("setup-list").innerHTML = dlPlannedIds.map(id => {
-    const e = setupCatalog.find(x => x.id === id) || { name: id };
+  const listHTML = dlPlannedIds.map(id => {
+    const e = setupCatalog.find(x => x.id === id) || { display_name: id };
     const failed = state.failed.find(f => f.id === id);
-    let mark = "·", cls = "queued";
-    if (state.completed.includes(id)) { mark = "✓"; cls = "ok"; }
-    else if (failed) { mark = "✗"; cls = "fail"; }
-    else if (cur && cur.id === id) { mark = "▶"; cls = "cur"; }
-    return `<div class="setup-list-row ${cls}"><span class="m">${mark}</span><span class="n">${e.name}</span>${failed ? `<span class="setup-list-err">${failed.error}</span>` : ""}</div>`;
+    let m = "·", cls = "queued";
+    if (state.completed.includes(id)) { m = "✓"; cls = "ok"; }
+    else if (failed) { m = "✗"; cls = "fail"; }
+    else if (cur && cur.id === id) { m = "▶"; cls = "cur"; }
+    return `<div class="setup-list-row ${cls}"><span class="m">${m}</span><span>${e.display_name}</span>${failed ? `<span class="setup-list-err">${failed.error}</span>` : ""}</div>`;
   }).join("");
 
-  if (["done", "error", "cancelled"].includes(state.phase)) terminalUi(state);
-}
+  chatEl.innerHTML = `
+    <div class="setup-panel">
+      <h2>${terminal ? (state.phase === "done" ? "Ferdig ✓" : state.phase === "cancelled" ? "Avbrutt" : "Noe gikk galt") : "Laster ned…"}</h2>
+      <div class="setup-bar"><div class="setup-bar-fill" style="width:${(frac * 100).toFixed(1)}%"></div></div>
+      <div class="setup-line">${finished} / ${total} filer${terminal ? " — " + phaseLabel(state.phase) : ""}</div>
+      ${cur ? `
+        <div class="setup-current-name">${cur.name}</div>
+        <div class="setup-bar"><div class="setup-bar-fill" style="width:${cur.total ? (cur.downloaded / cur.total * 100).toFixed(1) : 0}%"></div></div>
+        <div class="setup-line">${fmtSize(cur.downloaded)} / ${fmtSize(cur.total)}${cur.speed ? " · " + fmtSpeed(cur.speed) : ""}${(cur.speed && cur.total) ? " · " + fmtEta((cur.total - cur.downloaded) / cur.speed) : ""}</div>` : ""}
+      <div class="setup-list">${listHTML}</div>
+      <div class="setup-panel-btns">
+        ${terminal
+          ? `<button id="setup-again">Tilbake til valg</button><button id="setup-continue" class="setup-primary">Fortsett til appen</button>`
+          : `<button id="setup-cancel" class="confirm-danger-btn">Avbryt nedlasting</button>`}
+      </div>
+    </div>`;
 
-async function terminalUi(state) {
-  setupCancelBtn.classList.add("hidden");
-  const s = await window.pywebview.api.setup_status();
-  const complete = state.phase === "done" && s.missing_slots.length === 0;
-
-  setupTitleEl.textContent = complete ? "Ferdig ✓"
-    : state.phase === "cancelled" ? "Avbrutt" : "Noe gikk galt";
-
-  setupProceedBtn.classList.toggle("hidden", !(complete || s.can_use_app));
-  setupProceedBtn.textContent = complete ? "Åpne appen" : "Fortsett likevel";
-
-  const hideDownload = complete && setupFirstRun;
-  setupDownloadBtn.classList.toggle("hidden", hideDownload);
-  setupDownloadBtn.disabled = false;
-  setupDownloadBtn.textContent = complete ? "Last ned flere" : "Tilbake — prøv igjen";
-  setupDownloadBtn.onclick = () => showSetup({ firstRun: setupFirstRun });
-
-  setupCloseBtn.classList.toggle("hidden", setupFirstRun && !complete);
+  if (terminal) {
+    document.getElementById("setup-continue").onclick = finishSetup;
+    document.getElementById("setup-again").onclick = () => { setupBusy = false; renderSetupPanel(); };
+  } else {
+    const c = document.getElementById("setup-cancel");
+    c.onclick = () => { c.disabled = true; window.pywebview.api.cancel_model_downloads(); };
+  }
 }
 
 async function finishSetup() {
-  setupOverlayEl.classList.add("hidden");
-  await startupLoad();
+  setupBusy = false;
+  setSetupUiLocked(false);
+  await loadModels();
+  await refreshChatList();
+  await refreshDocList();
+  await refreshSkillList(true);
+  if (conversation.length > 1) renderConversation();
+  else chatEl.innerHTML = emptyStateHTML();
 }
 
-setupCancelBtn.onclick = () => {
-  setupCancelBtn.disabled = true;
-  window.pywebview.api.cancel_model_downloads();
-};
-setupProceedBtn.onclick = finishSetup;
-setupCloseBtn.onclick = () => setupOverlayEl.classList.add("hidden");
+function setSetupUiLocked(locked) {
+  document.getElementById("settings-btn").style.pointerEvents = locked ? "none" : "";
+  document.getElementById("settings-btn").style.opacity = locked ? "0.4" : "";
+  modelSelectEl.disabled = locked || allModels.length === 0;
+}
 
 document.addEventListener("click", (e) => {
-  if (e.target && e.target.id === "open-setup-btn") showSetup({ firstRun: false });
+  if (e.target && e.target.id === "open-setup-btn") renderSetupPanel();
 });
