@@ -54,8 +54,6 @@
 <div id="main">
   <header>
     <select id="model-select" class="model-select" title="Velg modell"></select>
-    <div style="flex:1"></div>
-    <button id="code-btn" title="Kode — la modellen endre filer i en mappe">&lt;/&gt;</button>
     <button id="settings-btn" title="Innstillinger">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -184,42 +182,6 @@
   </div>
 </div>
 
-<!-- ---------- Kode page ---------- -->
-<div id="code-overlay" class="hidden">
-  <div id="code-head">
-    <div class="code-head-left">
-      <strong>Kode</strong>
-      <span id="code-folder">Ingen mappe valgt</span>
-    </div>
-    <div class="code-head-right">
-      <button id="code-pick-btn" class="settings-small-btn">Velg mappe</button>
-      <button id="code-close-btn" class="icon-btn" style="font-size: 22px;">×</button>
-    </div>
-  </div>
-  <div id="code-body">
-    <div id="code-left">
-      <div id="code-sessions-wrap">
-        <div class="code-left-head"><span>Økter</span><button id="code-new-session" class="icon-btn" title="Ny økt">+ Ny</button></div>
-        <div id="code-sessions"></div>
-      </div>
-      <div id="code-tree-wrap">
-        <div class="code-left-head"><span>Filer</span></div>
-        <div id="code-tree"></div>
-      </div>
-    </div>
-    <div id="code-work"><div id="code-view"><div class="code-hint">Velg en mappe for å begynne.</div></div></div>
-  </div>
-  <div id="code-taskbar">
-    <textarea id="code-task" rows="2" placeholder="Beskriv hva modellen skal gjøre med prosjektet…"></textarea>
-    <div id="code-btns">
-      <span id="code-status"></span>
-      <button id="code-run-btn" class="setup-primary">Kjør</button>
-      <button id="code-apply-btn" class="setup-primary hidden">Bruk endringer</button>
-      <button id="code-cancel-btn" class="confirm-danger-btn hidden">Avbryt</button>
-    </div>
-  </div>
-</div>
-
 <script src="js/state.js"></script>
 <script src="js/models.js"></script>
 <script src="js/chat.js"></script>
@@ -227,7 +189,6 @@
 <script src="js/skills.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/setup.js"></script>
-<script src="js/coding.js"></script>
 <script src="js/main.js"></script>
 
 </body>

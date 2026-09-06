@@ -1,6 +1,6 @@
-"""The chat text generation - runs in a background thread and streams text
+"""The text generation itself - runs in a background thread and streams text
 chunks to the frontend via window.evaluate_js, so the UI never freezes while
-the model works. The Kode page has its own two-pass runner in coding.py."""
+the model works."""
 
 import json
 import threading

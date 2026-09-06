@@ -5,7 +5,6 @@ between JS calls and the Python functions."""
 import json
 
 import chats
-import coding
 import config
 import documents
 import downloader
@@ -15,44 +14,6 @@ import skills
 
 
 class Api:
-    # ---------------- Kode page ----------------
-
-    def code_pick_folder(self):
-        return coding.pick_folder()
-
-    def code_read_project(self):
-        return coding.read_project()
-
-    def code_run(self, model_name, task, history_json):
-        return coding.run_task(model_name, task, json.loads(history_json))
-
-    def code_continue(self, model_name, task, plan, history_json, partial):
-        return coding.continue_code(model_name, task, plan, json.loads(history_json), partial)
-
-    def code_apply(self, changes_json, deletions_json):
-        return coding.apply_changes(json.loads(changes_json), json.loads(deletions_json))
-
-    def code_cancel(self):
-        return coding.stop()
-
-    def code_set_folder(self, path):
-        return coding.set_folder(path)
-
-    def code_list_sessions(self):
-        return coding.list_sessions()
-
-    def code_load_session(self, sid):
-        return coding.load_session(sid)
-
-    def code_save_session(self, sid, name, folder, history_json):
-        return coding.save_session(sid or None, name, folder, json.loads(history_json))
-
-    def code_rename_session(self, sid, name):
-        return coding.rename_session(sid, name)
-
-    def code_delete_session(self, sid):
-        return coding.delete_session(sid)
-
     # ---------------- Model downloads ----------------
 
     def model_catalog(self):

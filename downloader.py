@@ -55,14 +55,6 @@ CATALOG = [
         "size_bytes": 8_990_000_000,
         "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
     },
-    {
-        "id": "code-7b", "role": "code", "size_label": "Qwen2.5-Coder 7B",
-        "note": "spesialisert på kode, for Kode-siden",
-        "filename": "qwen2.5-coder-7b-instruct-q4_k_m.gguf", "display_name": "Qwen2.5 Coder 7b",
-        "size_bytes": 4_680_000_000,
-        "url": "https://huggingface.co/bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf",
-    },
-
     # --- reasoning model: choose a size ---
     {
         "id": "reason-7b", "role": "reasoning", "size_label": "7B", "default": True,
