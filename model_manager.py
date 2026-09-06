@@ -3,6 +3,7 @@ background model (get_utility_model_filename) in memory, but unloads other
 large chat models when switching, to avoid holding several 7B-class models
 in RAM at once."""
 
+import ctypes
 import gc
 import os
 from llama_cpp import Llama
@@ -13,11 +14,56 @@ loaded_models = {}
 embedder = None
 
 
+def is_loaded(filename):
+    return filename in loaded_models
+
+
+def _available_ram_bytes():
+    """Free physical RAM, or None if it can't be determined (non-Windows,
+    or the call fails)."""
+    try:
+        class _MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        stat = _MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(stat)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+            return int(stat.ullAvailPhys)
+    except (AttributeError, OSError):
+        pass
+    return None
+
+
+def _check_ram(path):
+    """Raise a clear error instead of letting llama.cpp hard-crash the whole
+    process when there isn't enough RAM for a model this size."""
+    avail = _available_ram_bytes()
+    if avail is None:
+        return
+    size = os.path.getsize(path)
+    needed = size * 1.05 + 600_000_000  # model weights + a little runtime headroom
+    if avail < needed:
+        raise MemoryError(
+            f"Ikke nok ledig minne til å laste denne modellen. Den trenger omtrent "
+            f"{size / 1e9:.1f} GB, men bare {avail / 1e9:.1f} GB er ledig. Lukk andre "
+            f"programmer, velg en mindre modell, eller senk kontekstvinduet i Innstillinger."
+        )
+
+
 def get_model(filename):
     if filename not in loaded_models:
         path = os.path.join(config.MODELS_DIR, filename)
         if not os.path.exists(path):
             raise FileNotFoundError(f"Model file not found: {path}")
+        _check_ram(path)
         cfg = config.load_config()
         model_cfg = config.get_models_config().get(filename, {})
         device = model_cfg.get("device", "cpu")

@@ -240,6 +240,21 @@ Norwegian answer and an English one gets English. Background tasks
 their instructions are in English for reliability, but the text they
 produce matches the source language.
 
+### Loading feedback
+
+The first message to a model that isn't in RAM yet shows
+`laster <model>...` in the status line while the GGUF is read from disk
+(seconds to a minute on a slow machine), then switches to `genererer
+med <model>...`. Switching models mid-conversation shows the same while
+it recomputes the context estimate.
+
+### Reasoning models
+
+DeepSeek-R1 wraps its chain-of-thought in `<think>...</think>`. That
+part is shown live in a collapsible **Tankegang** block that folds away
+once the answer is done — click it to read the reasoning. Only the
+answer is saved to the conversation.
+
 ### Speed display
 
 Under each reply: `7B · standard · 12.4s · 5.8 tok/s`. An approximation
@@ -459,6 +474,12 @@ default; the GPU toggle in Settings is there if your hardware differs.
 **Thermal throttling.** After several heavy model runs in a row, a thin
 laptop CPU can lower its clock speed to avoid overheating. Speed can
 vary noticeably depending on how long the machine has been working.
+
+**Not enough RAM.** Before loading a model the app checks free physical
+RAM against the file size (Windows only). If there clearly isn't enough
+it stops with a message telling you how much is needed, instead of
+letting `llama.cpp` hard-crash the whole app. Close other programs, pick
+a smaller model, or lower the context window.
 
 **DeepSeek-R1 and Norwegian are a bad combination.** Its `<think>`
 reasoning is trained heavily on English and becomes unreliable in

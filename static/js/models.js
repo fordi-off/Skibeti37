@@ -40,6 +40,8 @@ async function selectModel(id) {
   window.pywebview.api.set_last_model(id);   // fire and forget
 
   if (conversation.length > 1) {
+    // estimate_context loads the model if it's cold, which blocks for a while.
+    if (!isGenerating) statusEl.textContent = `laster ${modelLabels[id] || id}...`;
     try {
       const info = await window.pywebview.api.estimate_context(
         currentChatId, currentModel, JSON.stringify(conversation)
@@ -48,6 +50,7 @@ async function selectModel(id) {
         updateContextMeter(info.context_used, info.context_max, info.compressed);
       }
     } catch (err) { /* silent */ }
+    if (!isGenerating) statusEl.textContent = "";
   }
 }
 

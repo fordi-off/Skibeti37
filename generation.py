@@ -98,7 +98,13 @@ def _generate(model_name, messages, chat_id=None, continuation=False):
         msgs = list(messages)
         if continuation:
             msgs.append({"role": "user", "content": CONTINUATION_PROMPT})
+        # Loading a cold GGUF blocks for many seconds with nothing to show -
+        # tell the UI so it doesn't look frozen.
+        phase = "generating" if model_manager.is_loaded(model_name) else "loading"
+        runtime.window.evaluate_js(f"onGenPhase({json.dumps(phase)})")
         llm = model_manager.ensure_only_model_loaded(model_name)
+        if phase == "loading":
+            runtime.window.evaluate_js('onGenPhase("generating")')
         final_messages, meta = chats.build_context(chat_id, model_name, msgs)
         _stream_and_report(llm, final_messages, meta, model_name)
     except Exception as e:

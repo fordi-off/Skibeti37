@@ -490,9 +490,17 @@ function onChunk(delta) {
   if (s.isReasoning) {
     if (s.rawBuffer.includes("<think>") && !s.inThinking && !s.thinkingEl) {
       s.inThinking = true;
+      const details = document.createElement("details");
+      details.className = "thinking-block";
+      details.open = true;   // visible while it streams, collapsed on done
+      const summary = document.createElement("summary");
+      summary.textContent = "Tankegang";
       s.thinkingEl = document.createElement("div");
-      s.thinkingEl.className = "thinking-block";
-      s.contentEl.appendChild(s.thinkingEl);
+      s.thinkingEl.className = "thinking-body";
+      details.appendChild(summary);
+      details.appendChild(s.thinkingEl);
+      s.thinkingDetails = details;
+      s.contentEl.appendChild(details);
     }
     if (s.inThinking) {
       s.inThinking = !s.rawBuffer.includes("</think>");
@@ -546,6 +554,7 @@ async function onDone(info) {
   }
 
   enhanceContent(s.contentEl);
+  if (s.thinkingDetails) s.thinkingDetails.open = false;   // tuck the reasoning away
 
   exitGeneratingUI();
   await persistChat();
@@ -554,6 +563,16 @@ async function onDone(info) {
 function onError(message) {
   window._streamState.contentEl.innerHTML += `<em>Feil: ${message}</em>`;
   exitGeneratingUI();
+}
+
+// Backend signal: "loading" while a cold model file is being read into RAM,
+// "generating" once tokens are about to flow.
+function onGenPhase(phase) {
+  if (!isGenerating) return;
+  const label = modelLabels[currentModel] || currentModel;
+  statusEl.textContent = phase === "loading"
+    ? `laster ${label}... (første gang tar det litt tid)`
+    : `genererer med ${label}...`;
 }
 
 formEl.addEventListener("submit", sendMessage);
