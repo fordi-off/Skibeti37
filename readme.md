@@ -54,6 +54,7 @@ your-folder/
 │   generation.py             ← streaming chat completion
 │   model_manager.py          ← loading/unloading GGUF models
 │   downloader.py             ← model catalog + first-run download queue
+│   coding.py                 ← Kode page: read a folder, apply proposed files
 │   runtime.py                ← shared window reference
 │   skills.py                  ← file-based skills
 │   requirements.txt
@@ -62,6 +63,7 @@ your-folder/
 ├───chats/                   ← created automatically - one .json file per conversation
 │   └───_context_summaries/    ← rolling-summary cache for long conversations
 ├───documents/                ← created automatically - the shared document library
+├───code_sessions/            ← created automatically - one .json per Kode work session
 ├───models/                    ← .gguf files (fetched by the in-app downloader)
 ├───skills/                    ← bundled: anti-ai-slop, tutor-mode, explain-simply, clear-norwegian
 │
@@ -80,11 +82,12 @@ your-folder/
             skills.js                ← right-panel skill switches
             settings.js               ← settings modal (all tabs)
             setup.js                  ← first-run / model-download screen
+            coding.js                 ← Kode page (plan → files → diff → apply)
             main.js                   ← startup
 ```
 
-`chats/`, `documents/`, and `config.json` are created automatically the
-first time you run the app and are all git-ignored — they are your local
+`chats/`, `documents/`, `code_sessions/`, and `config.json` are created
+automatically the first time you run the app and are all git-ignored — they are your local
 state, not part of the project. The shipped defaults live in code
 (`config.py`, `default_config()`); `config.json` only holds your changes
 to them, and **Settings → Ytelse → Tilbakestill** (or just deleting the
@@ -130,6 +133,8 @@ panel:
   **3B**, **7B** (default), or **14B**, or "Ingen".
 - **Resonneringsmodell** — pick a size for matte/logikk: DeepSeek-R1
   Distill **7B** (default, uncensored) or **14B**, or "Ingen".
+- **Kodemodell** — optional, off by default: Qwen2.5-Coder-7B for the
+  Kode page.
 - **Hopp over** downloads only the two automatic files and drops you
   into the app; add your own `.gguf` files to `models/` whenever.
 
@@ -332,6 +337,35 @@ yourself — a small "Svaret ble kuttet - fortsett →" / "Stoppet -
 fortsett →" button appears under it. Clicking it continues the exact
 same message seamlessly, with no repeated content and no new bubble.
 
+### Kode (the `</>` button, top right)
+
+A workspace where the model edits files in a folder you choose. It never
+runs anything — it only proposes file contents, and you apply each change.
+
+1. **Velg mappe** — pick a project folder. It reads the text files (skips
+   `.git`, `node_modules`, etc.; files over ~8 KB are listed but their
+   contents aren't sent; a project over ~20 files / ~48 KB of text is
+   refused as too big for local models).
+2. Type a task → **Lag plan**. A first pass produces a short plan (which
+   files to add/change/delete) that lands in an **editable box** — fix or
+   trim it.
+3. **Skriv koden** — a second pass (same model) writes every changed file
+   in full. The result is parsed into a **diff view**: `NY` / `ENDRET` /
+   `SLETT` per file, plus a **"Hva modellen gjorde"** summary.
+4. **Bruk endringer** — writes the checked files (deletions ask again
+   first). All writes are confined to the chosen folder. Then type a
+   follow-up task; the last few tasks + summaries are kept as context.
+
+The left column has **Økter** above the file tree: each work session
+(folder + its task/summary history) is saved to `code_sessions/` and
+reopens with the folder restored. `+ Ny` starts a fresh one; double-click
+a name to rename, `×` to delete (the folder's files are untouched).
+
+If the output is cut off, a **Fortsett svaret** button finishes it before
+you apply. Use the **Kodemodell** slot in the setup screen to install
+Qwen2.5-Coder-7B, and keep projects small — a 3-file change is a few
+minutes on a school CPU; anything large gets slow and unreliable.
+
 ---
 
 ## The Settings panel
@@ -442,11 +476,12 @@ each generated text chunk, triggering `onChunk()` on the page instantly.
 | `config.py` | Reading/writing `config.json`, scanning `models/` for `.gguf` files |
 | `model_manager.py` | Loading/unloading Llama instances, the embedder, the free-RAM check |
 | `downloader.py` | The downloadable-model catalog and the background download queue (resumable, progress events) |
+| `coding.py` | The Kode page: reading a project folder, building the plan/code prompts, and applying proposed files (path-checked to stay inside the folder) |
 | `chat_store.py` | Raw chat JSON file I/O (used by both `chats.py` and `documents.py`) |
 | `chats.py` | Chat CRUD, context building, rolling-summary compression |
 | `documents.py` | The document library, chunking/embedding, attach/detach, RAG retrieval |
 | `skills.py` | Reading/writing skill files, active-state tracking |
-| `generation.py` | The actual streaming generation loop |
+| `generation.py` | The streaming generation loop, shared by the chat and the Kode page (a `tag` picks which JS callbacks the chunks go to) |
 | `api.py` | Exposes all of the above to JavaScript under stable method names |
 | `runtime.py` | Holds the live `window` reference so other modules can call `evaluate_js` without circular imports |
 | `app.py` | Just creates the window and starts the event loop |

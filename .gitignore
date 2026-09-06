@@ -5,6 +5,7 @@ models/
 # Personal data - your own conversations and uploaded documents
 chats/
 documents/
+code_sessions/
 
 # Local settings - written by the app, regenerated from code defaults
 # (config.py: default_config) on first run. Reset from Settings > Ytelse.

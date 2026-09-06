@@ -47,6 +47,9 @@ async function renderSetupPanel() {
       <label>Resonneringsmodell (matte / logikk)
         <select id="setup-reason">${opts("reasoning")}<option value="">Ingen — jeg legger til selv</option></select>
       </label>
+      <label>Kodemodell (for Kode-siden — valgfritt)
+        <select id="setup-code"><option value="" selected>Ingen</option>${opts("code")}</select>
+      </label>
 
       <div class="setup-panel-total" id="setup-total"></div>
       <div class="setup-panel-btns">
@@ -57,22 +60,22 @@ async function renderSetupPanel() {
 
   const mainSel = document.getElementById("setup-main");
   const reasonSel = document.getElementById("setup-reason");
+  const codeSel = document.getElementById("setup-code");
   const totalEl = document.getElementById("setup-total");
+  const chosen = () => [mainSel.value, reasonSel.value, codeSel.value].filter(Boolean);
 
   const recalcTotal = () => {
-    const ids = ["embed", "utility", mainSel.value, reasonSel.value].filter(Boolean);
+    const ids = ["embed", "utility", ...chosen()];
     const bytes = ids.reduce((s, id) => {
       const e = setupCatalog.find(x => x.id === id);
       return s + (e && !e.installed ? (e.size_bytes || 0) : 0);
     }, 0);
     totalEl.textContent = `Å laste ned: ${fmtSize(bytes) === "0 MB" ? "ingenting nytt" : fmtSize(bytes)}`;
   };
-  mainSel.addEventListener("change", recalcTotal);
-  reasonSel.addEventListener("change", recalcTotal);
+  [mainSel, reasonSel, codeSel].forEach(s => s.addEventListener("change", recalcTotal));
   recalcTotal();
 
-  document.getElementById("setup-go").onclick = () =>
-    startSetupDownload([mainSel.value, reasonSel.value].filter(Boolean));
+  document.getElementById("setup-go").onclick = () => startSetupDownload(chosen());
   document.getElementById("setup-skip").onclick = () => startSetupDownload([]);
 }
 
