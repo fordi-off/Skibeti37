@@ -89,9 +89,33 @@ async function refreshSettingsModelList() {
     nameInput.onblur = save;
     nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") nameInput.blur(); });
 
+    const delBtn = document.createElement("button");
+    delBtn.className = "settings-small-btn danger";
+    delBtn.textContent = "Slett";
+    delBtn.title = "Slett modellfilen fra disken";
+    delBtn.onclick = async () => {
+      if (isGenerating) {
+        await confirmDialog("Kan ikke slette en modell mens den genererer et svar. Vent til den er ferdig.");
+        return;
+      }
+      const ok = await confirmDialog(
+        `Slette modellfilen «${model.display_name}» (${model.filename}) fra disken? ` +
+        `Dette kan ikke angres — du må laste den ned på nytt hvis du vil ha den tilbake.`
+      );
+      if (!ok) return;
+      try {
+        await window.pywebview.api.delete_model(model.filename);
+      } catch (err) {
+        await confirmDialog("Klarte ikke å slette modellen (kanskje den er i bruk): " + err);
+      }
+      await loadModels();
+      refreshSettingsModelList();
+    };
+
     row.appendChild(activeToggle);
     row.appendChild(nameWrap);
     row.appendChild(deviceSelect);
+    row.appendChild(delBtn);
     container.appendChild(row);
   });
 }

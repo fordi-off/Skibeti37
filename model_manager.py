@@ -89,6 +89,18 @@ def unload_all():
     gc.collect()
 
 
+def remove_model(filename):
+    """Unload the model (even the background one) and delete its file plus any
+    leftover .part. Raises if the file can't be removed (e.g. still in use)."""
+    if filename in loaded_models:
+        del loaded_models[filename]
+        gc.collect()
+    path = os.path.join(config.MODELS_DIR, filename)
+    for p in (path, path + ".part"):
+        if os.path.isfile(p):
+            os.remove(p)
+
+
 def ensure_only_model_loaded(filename):
     """Loads the requested model and unloads other large chat models that
     are no longer in use (always keeps the background model)."""

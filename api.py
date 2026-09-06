@@ -57,6 +57,18 @@ class Api:
         model_manager.unload_model(filename)
         return self.list_all_models_settings()
 
+    def delete_model(self, filename):
+        """Delete a model's .gguf from disk and forget its settings."""
+        model_manager.remove_model(filename)
+        cfg = config.load_config()
+        cfg.get("models", {}).pop(filename, None)
+        if cfg.get("last_model") == filename:
+            cfg["last_model"] = None
+        if cfg.get("utility_model") == filename:
+            cfg["utility_model"] = None
+        config.save_config(cfg)
+        return self.list_all_models_settings()
+
     def get_last_model(self):
         return config.load_config().get("last_model")
 

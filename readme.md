@@ -140,8 +140,9 @@ The catalog (URLs, sizes, quants) lives in `downloader.py`.
 
 Everything lands as a single-file GGUF in `models/` and is still
 **discovered automatically** — anything you drop in yourself shows up too.
-Downloading a different size does **not** remove the old one; delete the
-`.gguf` from `models/` if you want the space back.
+Downloading a different size does **not** remove the old one; delete
+unwanted models from **Settings → Modeller → Slett** (or remove the
+`.gguf` from `models/` by hand).
 
 ---
 
@@ -344,6 +345,9 @@ each with:
   picker at all
 - An editable display name
 - A CPU/GPU dropdown per model (defaults to CPU)
+- **Slett** — deletes the `.gguf` (and any `.part`) from disk after a
+  confirmation. Not available while that model is generating. The
+  embedding model isn't listed here, so it can't be deleted by accident
 
 ### Dokumenter
 The entire document library, regardless of which conversations each
