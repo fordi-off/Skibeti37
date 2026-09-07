@@ -154,16 +154,21 @@ class Api:
     def preview_document(self, doc_id):
         return documents.preview_document(doc_id)
 
-    # ---------------- Skills ----------------
+    # ---------------- Skills / slash commands ----------------
+
+    def list_commands(self):
+        """Flat list of every slash command, for the / menu and the panel."""
+        return skills.list_commands()
 
     def list_skills(self):
+        """Skills grouped by file, for the Settings tab."""
         return skills.list_skills()
 
-    def toggle_skill(self, skill_id):
-        return skills.toggle_skill(skill_id)
-
     def add_skill(self, name, content):
-        return skills.add_skill(name, content)
+        try:
+            return {"skills": skills.add_skill(name, content)}
+        except ValueError as e:
+            return {"error": str(e)}
 
     def delete_skill(self, skill_id):
         return skills.delete_skill(skill_id)

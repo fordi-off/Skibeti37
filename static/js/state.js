@@ -2,6 +2,7 @@ marked.setOptions({ breaks: true, gfm: true });
 
 let allModels = [];          // [{id, name}]
 let modelLabels = {};        // id -> name (short display text)
+let allCommands = [];        // [{command, description, skill}] - slash commands
 let currentModel = null;
 let currentChatId = null;
 let currentChatName = null;

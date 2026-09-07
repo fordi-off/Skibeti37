@@ -151,7 +151,7 @@ async function finishSetup() {
   await loadModels();
   await refreshChatList();
   await refreshDocList();
-  await refreshSkillList(true);
+  await loadCommands(true);
   if (conversation.length > 1) renderConversation();
   else chatEl.innerHTML = emptyStateHTML();
 }

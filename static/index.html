@@ -31,19 +31,10 @@
     <div class="section-head">
       <h2>Dokumenter</h2>
       <div class="section-head-actions">
-        <button class="icon-btn" id="add-doc-btn" title="Last opp ny fil">+ Ny fil</button>
-        <button class="icon-btn" id="browse-doc-btn" title="Velg fra bibliotek">📚 Bibliotek</button>
+        <button class="icon-btn" id="add-doc-btn" title="Legg til dokument">+ Legg til</button>
       </div>
     </div>
     <div id="doc-status"></div>
-
-    <div id="doc-library-panel" class="hidden">
-      <div class="lib-head">
-        <span>Velg fra indekserte dokumenter</span>
-        <button class="icon-btn" id="close-library-btn" title="Lukk">×</button>
-      </div>
-      <div id="doc-library-list"></div>
-    </div>
 
     <div class="scroll-list" id="doc-list">
       <div class="empty-hint">Ingen dokumenter lagt til. Støtter .txt og .md.</div>
@@ -72,8 +63,9 @@
       <span id="context-meter-text"></span>
     </div>
     <div class="status-line" id="status-line"></div>
+    <div id="cmd-menu" class="hidden"></div>
     <form id="input-form">
-      <textarea id="input-field" rows="1" placeholder="Skriv en melding...  (Enter sender, Shift+Enter gir ny linje)" autocomplete="off"></textarea>
+      <textarea id="input-field" rows="1" placeholder="Skriv en melding...  (Enter sender, Shift+Enter gir ny linje, / for kommandoer)" autocomplete="off"></textarea>
       <button id="send-btn" type="submit">Send</button>
     </form>
   </div>
@@ -81,11 +73,12 @@
 
 <div id="skills-sidebar">
   <div class="section-head">
-    <h2>Skills</h2>
-    <button class="icon-btn" id="refresh-skills-btn" title="Oppdater skills-listen (leser skills/-mappen på nytt)">↻</button>
+    <h2>Kommandoer</h2>
+    <button class="icon-btn" id="refresh-skills-btn" title="Les skills/-mappen på nytt">↻</button>
   </div>
+  <div class="cmd-hint">Skriv <code>/</code> i meldingsfeltet for å bruke en. Klikk en her for å sette den inn.</div>
   <div class="scroll-list" id="skill-list">
-    <div class="empty-hint">Ingen skills ennå.</div>
+    <div class="empty-hint">Ingen kommandoer ennå.</div>
   </div>
 </div>
 
@@ -116,11 +109,26 @@
       </div>
 
       <div class="settings-pane" id="pane-skills">
-        <div class="settings-note">Skills er filer i skills/-mappen. Her kan du lage nye eller slette eksisterende - av/på-bryteren i høyre panel styrer om de er aktive.</div>
+        <div class="settings-note">
+          En skill er en fil i skills/-mappen som kan definere flere skråstrek-kommandoer.
+          Brukeren skriver f.eks. <code>/humanize</code> først i en melding, og kommandoens
+          instruksjon legges til for det ene svaret. Formatet:
+        </div>
+        <pre class="skill-format-example"># Navn på skillen (vises her)
+
+## /kommando  Kort beskrivelse som vises i /-menyen
+Instruksjonen modellen skal følge for denne kommandoen.
+Alt fram til neste "## /..." (eller slutten av fila) hører med.
+
+## /neste-kommando
+Beskrivelse på egen linje hvis du ikke skrev den på ##-linja.
+
+Instruksjonen for denne.</pre>
         <div id="settings-skill-list"></div>
         <div class="settings-add-form">
-          <input id="new-skill-name" type="text" placeholder="Navn på ny skill" />
-          <textarea id="new-skill-content" placeholder="Instruksjoner modellen skal følge når denne skillen er aktiv..."></textarea>
+          <input id="new-skill-name" type="text" placeholder="Navn på skillen (f.eks. Skrivehjelp)" />
+          <textarea id="new-skill-content" placeholder="## /kommando  Kort beskrivelse&#10;Instruksjonen modellen skal følge...&#10;&#10;## /kommando-to  ...&#10;..."></textarea>
+          <div id="new-skill-error" class="skill-add-error hidden"></div>
           <button id="new-skill-save-btn">Legg til skill</button>
         </div>
       </div>
@@ -167,6 +175,24 @@
       <div id="doc-preview-summary"></div>
       <h3>Full tekst (rekonstruert fra indekserte biter)</h3>
       <div id="doc-preview-fulltext" style="white-space: pre-wrap;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Add document ---------- -->
+<div id="doc-add-overlay" class="hidden">
+  <div id="doc-add-modal">
+    <div class="settings-header">
+      <h2>Legg til dokument</h2>
+      <button id="doc-add-close-btn" class="icon-btn" style="font-size: 20px;">×</button>
+    </div>
+    <div class="doc-add-body">
+      <button id="doc-add-upload-btn" class="doc-add-upload">
+        <span class="doc-add-upload-title">Last opp en fil</span>
+        <span class="doc-add-upload-sub">Velg en .txt- eller .md-fil fra maskinen. Den indekseres og legges til samtalen.</span>
+      </button>
+      <div class="doc-add-divider"><span>eller velg fra biblioteket</span></div>
+      <div id="doc-add-library"></div>
     </div>
   </div>
 </div>

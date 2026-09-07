@@ -4,7 +4,7 @@ async function startupLoad() {
   await loadModels();
   await refreshChatList();
   await refreshDocList();
-  await refreshSkillList(true);
+  await loadCommands(true);
 }
 
 window.addEventListener("pywebviewready", async () => {

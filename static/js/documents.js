@@ -2,7 +2,7 @@
 
 async function refreshDocList() {
   if (!currentChatId) {
-    docListEl.innerHTML = `<div class="empty-hint">Denne samtalen har ingen dokumenter ennå. Last opp en fil eller velg fra biblioteket (samtalen lagres automatisk).</div>`;
+    docListEl.innerHTML = `<div class="empty-hint">Denne samtalen har ingen dokumenter ennå. Trykk «+ Legg til» for å laste opp en fil eller hente en fra biblioteket (samtalen lagres automatisk).</div>`;
     return;
   }
 
@@ -10,7 +10,7 @@ async function refreshDocList() {
   docListEl.innerHTML = "";
 
   if (docs.length === 0) {
-    docListEl.innerHTML = `<div class="empty-hint">Ingen dokumenter i denne samtalen. Støtter .txt og .md.</div>`;
+    docListEl.innerHTML = `<div class="empty-hint">Ingen dokumenter i denne samtalen. Trykk «+ Legg til». Støtter .txt og .md.</div>`;
     return;
   }
 
@@ -56,8 +56,57 @@ async function refreshDocList() {
   });
 }
 
-document.getElementById("add-doc-btn").onclick = async () => {
+// Called from Python while a document is being indexed / summarised.
+function onDocStatus(text) {
+  docStatusEl.textContent = text || "";
+  statusEl.textContent = text || "";
+}
+
+// ---------------- Add-document dialog ----------------
+
+const docAddOverlayEl = document.getElementById("doc-add-overlay");
+const docAddLibraryEl = document.getElementById("doc-add-library");
+
+function openDocAdd() {
+  ensureChatExists().then(async () => {
+    await renderDocAddLibrary();
+    docAddOverlayEl.classList.remove("hidden");
+  });
+}
+
+function closeDocAdd() {
+  docAddOverlayEl.classList.add("hidden");
+}
+
+async function renderDocAddLibrary() {
+  const docs = await window.pywebview.api.list_available_documents(currentChatId);
+  docAddLibraryEl.innerHTML = "";
+
+  if (docs.length === 0) {
+    docAddLibraryEl.innerHTML = `<div class="empty-hint">Biblioteket er tomt, eller alt ligger allerede i denne samtalen.</div>`;
+    return;
+  }
+
+  docs.forEach(doc => {
+    const row = document.createElement("button");
+    row.className = "doc-add-lib-row";
+    row.innerHTML = `<span class="doc-add-lib-name"></span><span class="doc-add-lib-sub"></span>`;
+    row.querySelector(".doc-add-lib-name").textContent = doc.filename;
+    row.querySelector(".doc-add-lib-sub").textContent = doc.summary || "";
+    row.onclick = async () => {
+      row.disabled = true;
+      await window.pywebview.api.attach_existing_document(currentChatId, doc.id);
+      closeDocAdd();
+      refreshDocList();
+    };
+    docAddLibraryEl.appendChild(row);
+  });
+}
+
+async function uploadNewDocument() {
   const chatId = await ensureChatExists();
+  closeDocAdd();
+
   const addDocBtn = document.getElementById("add-doc-btn");
   addDocBtn.disabled = true;
   inputEl.disabled = true;
@@ -76,50 +125,14 @@ document.getElementById("add-doc-btn").onclick = async () => {
     sendBtn.disabled = isGenerating;
     statusEl.textContent = "";
   }
-};
-
-// Called from Python while the document is being summarised
-function onDocStatus(text) {
-  docStatusEl.textContent = text || "";
-  statusEl.textContent = text || "";
 }
 
-// --- Library picker ---
-
-const libraryPanelEl = document.getElementById("doc-library-panel");
-const libraryListEl = document.getElementById("doc-library-list");
-
-document.getElementById("browse-doc-btn").onclick = async () => {
-  await ensureChatExists();
-  const docs = await window.pywebview.api.list_available_documents(currentChatId);
-  libraryListEl.innerHTML = "";
-
-  if (docs.length === 0) {
-    libraryListEl.innerHTML = `<div class="empty-hint">Ingen andre dokumenter i biblioteket.</div>`;
-  } else {
-    docs.forEach(doc => {
-      const item = document.createElement("div");
-      item.className = "lib-item";
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "lib-name";
-      nameSpan.textContent = doc.filename;
-      nameSpan.title = doc.filename;
-      const addBtn = document.createElement("button");
-      addBtn.textContent = "Legg til";
-      addBtn.onclick = async () => {
-        await window.pywebview.api.attach_existing_document(currentChatId, doc.id);
-        libraryPanelEl.classList.add("hidden");
-        refreshDocList();
-      };
-      item.appendChild(nameSpan);
-      item.appendChild(addBtn);
-      libraryListEl.appendChild(item);
-    });
-  }
-
-  libraryPanelEl.classList.remove("hidden");
-};
-
-document.getElementById("close-library-btn").onclick = () => {
-  libraryPanelEl.classList.add("hidden");
-};
+document.getElementById("add-doc-btn").onclick = openDocAdd;
+document.getElementById("doc-add-upload-btn").onclick = uploadNewDocument;
+document.getElementById("doc-add-close-btn").onclick = closeDocAdd;
+docAddOverlayEl.addEventListener("click", (e) => {
+  if (e.target === docAddOverlayEl) closeDocAdd();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !docAddOverlayEl.classList.contains("hidden")) closeDocAdd();
+});

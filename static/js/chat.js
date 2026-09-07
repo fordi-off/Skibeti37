@@ -132,7 +132,7 @@ function renderConversation() {
   let hasContent = false;
   conversation.forEach((msg, ci) => {
     if (msg.role === "user") {
-      addUserMessage(msg.content, ci);
+      addUserMessage(msg.content, ci, msg.commands);
       hasContent = true;
     } else if (msg.role === "assistant") {
       const { contentEl, div } = addAssistantMessage(currentModel, ci);
@@ -147,7 +147,7 @@ function renderConversation() {
   }
 }
 
-function addUserMessage(text, ci) {
+function addUserMessage(text, ci, commands) {
   clearEmptyState();
   const div = document.createElement("div");
   div.className = "msg user";
@@ -157,6 +157,17 @@ function addUserMessage(text, ci) {
     <div class="bubble"></div>
   `;
   div.querySelector(".bubble").textContent = text;
+  if (commands && commands.length) {
+    const chips = document.createElement("div");
+    chips.className = "msg-cmds";
+    commands.forEach(c => {
+      const chip = document.createElement("span");
+      chip.className = "msg-cmd-chip";
+      chip.textContent = "/" + c;
+      chips.appendChild(chip);
+    });
+    div.appendChild(chips);
+  }
   const editBtn = div.querySelector(".msg-edit-btn");
   editBtn.innerHTML = EDIT_ICON;
   editBtn.onclick = () => startEditMessage(div);
@@ -340,13 +351,21 @@ async function sendMessage(e) {
   e.preventDefault();
   if (isGenerating) { stopGeneration(); return; }
 
-  const text = inputEl.value.trim();
-  if (!text || !currentModel) return;
+  const raw = inputEl.value.trim();
+  if (!raw || !currentModel) return;
+
+  // Pull any leading "/command" tokens off the message. They don't go to the
+  // model as text - the command's instruction is added server-side instead.
+  const { text, commands } = extractCommands(raw);
+  if (!text) { statusEl.textContent = "Skriv en melding etter kommandoen."; return; }
 
   inputEl.value = "";
+  hideCmdMenu();
   autoGrow(inputEl, 160);
-  conversation.push({ role: "user", content: text });
-  addUserMessage(text, conversation.length - 1);
+  const msg = { role: "user", content: text };
+  if (commands.length) msg.commands = commands;
+  conversation.push(msg);
+  addUserMessage(text, conversation.length - 1, commands);
   await runGeneration();
 }
 
@@ -430,7 +449,9 @@ async function startEditMessage(msgEl) {
       if (!ok) return;
     }
 
-    conversation[ci] = { role: "user", content: newText };
+    const edited = { role: "user", content: newText };
+    if (conversation[ci].commands) edited.commands = conversation[ci].commands;
+    conversation[ci] = edited;
     conversation.length = ci + 1;
     renderConversation();
     await runGeneration();

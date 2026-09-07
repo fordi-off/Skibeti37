@@ -202,12 +202,30 @@ async function refreshSettingsSkillList(force) {
 
   skills.forEach(skill => {
     const row = document.createElement("div");
-    row.className = "settings-row";
+    row.className = "settings-row skill-settings-row";
 
-    const nameSpan = document.createElement("span");
-    nameSpan.style.flex = "1";
-    nameSpan.style.fontSize = "13.5px";
+    const info = document.createElement("div");
+    info.style.flex = "1";
+    info.style.minWidth = "0";
+    const nameSpan = document.createElement("div");
+    nameSpan.className = "skill-settings-name";
     nameSpan.textContent = skill.name;
+    info.appendChild(nameSpan);
+
+    const cmds = document.createElement("div");
+    cmds.className = "skill-settings-cmds";
+    if (skill.commands.length === 0) {
+      cmds.innerHTML = `<span class="skill-settings-warn">ingen gyldig kommando – sjekk formatet</span>`;
+    } else {
+      skill.commands.forEach(c => {
+        const chip = document.createElement("span");
+        chip.className = "skill-settings-chip";
+        chip.textContent = "/" + c.command;
+        chip.title = c.description || "";
+        cmds.appendChild(chip);
+      });
+    }
+    info.appendChild(cmds);
 
     const delBtn = document.createElement("button");
     delBtn.className = "settings-small-btn danger";
@@ -215,24 +233,39 @@ async function refreshSettingsSkillList(force) {
     delBtn.onclick = async () => {
       await window.pywebview.api.delete_skill(skill.id);
       refreshSettingsSkillList(true);
-      refreshSkillList(true);
+      loadCommands(true);
     };
 
-    row.appendChild(nameSpan);
+    row.appendChild(info);
     row.appendChild(delBtn);
     container.appendChild(row);
   });
 }
 
 document.getElementById("new-skill-save-btn").onclick = async () => {
-  const name = document.getElementById("new-skill-name").value.trim();
-  const content = document.getElementById("new-skill-content").value.trim();
-  if (!name || !content) return;
-  await window.pywebview.api.add_skill(name, content);
-  document.getElementById("new-skill-name").value = "";
-  document.getElementById("new-skill-content").value = "";
+  const nameEl = document.getElementById("new-skill-name");
+  const contentEl = document.getElementById("new-skill-content");
+  const errEl = document.getElementById("new-skill-error");
+  const name = nameEl.value.trim();
+  const content = contentEl.value.trim();
+  errEl.classList.add("hidden");
+
+  if (!name || !content) {
+    errEl.textContent = "Fyll inn både navn og innhold.";
+    errEl.classList.remove("hidden");
+    return;
+  }
+
+  const result = await window.pywebview.api.add_skill(name, content);
+  if (result && result.error) {
+    errEl.textContent = result.error;
+    errEl.classList.remove("hidden");
+    return;
+  }
+  nameEl.value = "";
+  contentEl.value = "";
   refreshSettingsSkillList(true);
-  refreshSkillList(true);
+  loadCommands(true);
 };
 
 // --- Performance tab (context window + threads) ---

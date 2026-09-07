@@ -118,13 +118,16 @@ def build_context(chat_id, model_name, messages):
     system_content = messages[0]["content"]
     history = messages[1:]
 
-    skills_text = skills.active_skills_text()
-    if skills_text:
-        system_content += "\n\n" + skills_text
+    last_user = next((m for m in reversed(history) if m["role"] == "user"), None)
+    last_user_msg = last_user["content"] if last_user else ""
 
-    last_user_msg = next(
-        (m["content"] for m in reversed(history) if m["role"] == "user"), ""
-    )
+    # Slash commands invoked on the most recent user message apply to this
+    # reply only. They are stored on the message itself, so regenerate and
+    # edit reuse them without any extra plumbing.
+    commands_text = skills.command_bodies(last_user.get("commands") if last_user else None)
+    if commands_text:
+        system_content += "\n\n" + commands_text
+
     doc_context, doc_sources = documents.document_context_for_query(chat_id, last_user_msg)
     if doc_context:
         system_content += "\n\n" + doc_context

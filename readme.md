@@ -55,7 +55,7 @@ your-folder/
 │   model_manager.py          ← loading/unloading GGUF models
 │   downloader.py             ← model catalog + first-run download queue
 │   runtime.py                ← shared window reference
-│   skills.py                  ← file-based skills
+│   skills.py                  ← file-based skills / slash commands
 │   requirements.txt
 │   README.md
 │
@@ -63,7 +63,7 @@ your-folder/
 │   └───_context_summaries/    ← rolling-summary cache for long conversations
 ├───documents/                ← created automatically - the shared document library
 ├───models/                    ← .gguf files (fetched by the in-app downloader)
-├───skills/                    ← bundled: anti-ai-slop, tutor-mode, explain-simply, clear-norwegian
+├───skills/                    ← bundled: writing.md, language.md, tutor.md (each defines one or more /commands)
 │
 └───static/
     │   index.html              ← page structure only
@@ -76,8 +76,8 @@ your-folder/
             state.js              ← shared state, DOM refs, formatting helpers
             models.js               ← model picker
             chat.js                 ← chat list + message rendering/streaming
-            documents.js             ← document panel + library picker
-            skills.js                ← right-panel skill switches
+            documents.js             ← document panel + add-document dialog
+            skills.js                ← /command reference panel + input autocomplete
             settings.js               ← settings modal (all tabs)
             setup.js                  ← first-run / model-download screen
             main.js                   ← startup
@@ -276,10 +276,10 @@ See the RAG section below for the mechanism. In short: documents are
 indexed **once** into a shared library, and individually **attached**
 to whichever conversations need them.
 
-- **"+ Ny fil"** uploads and indexes a new file, auto-attaching it to
-  the current conversation
-- **"📚 Bibliotek"** lets you attach a document you already indexed in
-  a different conversation, without re-processing it
+- **"+ Legg til"** opens one dialog with both options: **Last opp en
+  fil** (pick a `.txt`/`.md` from disk — it gets indexed and attached),
+  or pick a document already in the library to attach it without
+  re-processing
 - The checkbox toggles a document on/off in the current conversation
   without detaching it
 - **×** **detaches** the document from this conversation only — it
@@ -291,19 +291,47 @@ dokumentutdrag brukt i svaret"** line appears under it, listing the
 exact excerpts (filename, similarity score, and the opening words) that
 were retrieved and fed to the model for that answer.
 
-### Skills (right sidebar)
+### Slash commands (right sidebar)
 
-Toggle switches for reusable writing-style/behavior instructions,
-applied globally across all conversations when active. Skills are
-plain `.txt`/`.md` files in `skills/` — see the Settings section below
-for creating/deleting them, or just drop a `.txt`/`.md` file into that
-folder. The panel re-reads `skills/` every few seconds and when the
-window regains focus, so new files show up without a restart; the ↻
-button forces an immediate refresh.
+Reusable writing-style / behavior instructions you invoke **per
+message** by typing them at the start: `/humanize summarise this`
+applies the "humanize" instruction to that one reply only. Type them
+again next time you want them — nothing stays on globally.
 
-Four are bundled (all off by default): `anti-ai-slop` (writing style),
-`tutor-mode` (guide instead of answering), `explain-simply`, and
-`clear-norwegian` (proofreading).
+- Start typing `/` in the message box and an **autocomplete menu**
+  shows the matching commands with a one-line description. ↑/↓ to move,
+  Enter or Tab to pick, Esc to dismiss.
+- The right panel lists every available command grouped by skill file.
+  Click one to drop it into the input.
+- Used commands show as small `/name` chips under your message. Edit or
+  regenerate reuses them.
+
+**Skill file format.** A skill is one `.md` file in `skills/` that can
+define several commands:
+
+```markdown
+# Skrivehjelp
+
+## /humanize  Fjern AI-preg – skriv naturlig og direkte
+The full instruction the model follows for this command. Everything
+down to the next "## /..." heading (or the end of the file) is the
+instruction body.
+
+## /kort
+Description on its own first line if you didn't put it on the ## line.
+
+The instruction body for this one.
+```
+
+`# Name` is the skill's display name. Each `## /command` starts a
+command; its description is the rest of that line, or the first line
+under it. Drop a new `.md` file into `skills/` (or edit one) and the
+panel and autocomplete pick it up within a few seconds — no restart.
+The ↻ button forces an immediate refresh.
+
+Three skill files are bundled: **writing.md** (`/humanize`, `/kort`,
+`/enkelt`), **language.md** (`/norsk`, `/korrektur`), **tutor.md**
+(`/tutor`).
 
 ### Formatting
 
@@ -356,10 +384,11 @@ reconstructed full text; **"Slett"** removes it everywhere, cleaning up
 references in every conversation automatically.
 
 ### Skills
-Full CRUD here: create a new skill (name + instructions), or delete an
-existing one. The right-panel switches still just turn skills on/off —
-creation and deletion live here, since skills are meant to be managed
-as deliberate, reusable files rather than ad-hoc chat state.
+Create a new skill file (name + the multi-command markdown, with the
+format shown inline), or delete an existing one. Each row lists the
+`/commands` that file defines; a file that doesn't parse to any valid
+command is flagged. The right panel is a read-only reference — creation
+and deletion live here.
 
 ### Ytelse (Performance)
 - **Context window slider** — doubles at each step (4096 → 8192 →
@@ -445,7 +474,7 @@ each generated text chunk, triggering `onChunk()` on the page instantly.
 | `chat_store.py` | Raw chat JSON file I/O (used by both `chats.py` and `documents.py`) |
 | `chats.py` | Chat CRUD, context building, rolling-summary compression |
 | `documents.py` | The document library, chunking/embedding, attach/detach, RAG retrieval |
-| `skills.py` | Reading/writing skill files, active-state tracking |
+| `skills.py` | Parsing skill files into `/commands`, resolving invoked commands to instruction text |
 | `generation.py` | The streaming generation loop |
 | `api.py` | Exposes all of the above to JavaScript under stable method names |
 | `runtime.py` | Holds the live `window` reference so other modules can call `evaluate_js` without circular imports |
