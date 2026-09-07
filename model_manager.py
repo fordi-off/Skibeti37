@@ -42,20 +42,46 @@ def _available_ram_bytes():
     return None
 
 
+def _kv_cache_reserve(weights_bytes, n_ctx):
+    """Rough RAM the KV cache will need, given q8_0 K/V quantisation. Scales
+    with context length and (via the file size) the model's depth/width.
+    Deliberately a slight over-estimate - better to warn early than swap."""
+    return (n_ctx / 4096) * (weights_bytes / 4e9) * 0.25e9
+
+
 def _check_ram(path):
     """Raise a clear error instead of letting llama.cpp hard-crash the whole
-    process when there isn't enough RAM for a model this size."""
+    process (or thrash the disk via mmap) when there isn't enough RAM for a
+    model this size plus its KV cache."""
     avail = _available_ram_bytes()
     if avail is None:
         return
     size = os.path.getsize(path)
-    needed = size * 1.05 + 600_000_000  # model weights + a little runtime headroom
+    n_ctx = config.load_config().get("context_window", config.DEFAULT_CONTEXT)
+    needed = size * 1.06 + _kv_cache_reserve(size, n_ctx) + 700_000_000
     if avail < needed:
         raise MemoryError(
             f"Ikke nok ledig minne til å laste denne modellen. Den trenger omtrent "
-            f"{size / 1e9:.1f} GB, men bare {avail / 1e9:.1f} GB er ledig. Lukk andre "
-            f"programmer, velg en mindre modell, eller senk kontekstvinduet i Innstillinger."
+            f"{needed / 1e9:.1f} GB (modell + kontekst), men bare {avail / 1e9:.1f} GB "
+            f"er ledig. Lukk andre programmer, velg en mindre modell, eller senk "
+            f"kontekstvinduet i Innstillinger."
         )
+
+
+def _new_llama(path, n_ctx, n_threads, n_gpu_layers):
+    common = dict(
+        model_path=path, n_ctx=n_ctx, n_threads=n_threads,
+        n_gpu_layers=n_gpu_layers, verbose=False,
+        # Widen the repetition-penalty window past llama.cpp's default of 64
+        # tokens, so the penalty can see - and break out of - paragraph loops.
+        last_n_tokens_size=320,
+    )
+    try:
+        # q8_0 K/V cache roughly halves the context memory with no meaningful
+        # quality loss; lets bigger models / longer contexts fit in RAM.
+        return Llama(**common, type_k=8, type_v=8)
+    except Exception:
+        return Llama(**common)
 
 
 def get_model(filename):
@@ -70,14 +96,7 @@ def get_model(filename):
         n_gpu_layers = -1 if device == "gpu" else 0
         n_ctx = cfg.get("context_window", config.DEFAULT_CONTEXT)
         n_threads = cfg.get("n_threads", config.DEFAULT_THREADS)
-        loaded_models[filename] = Llama(
-            model_path=path, n_ctx=n_ctx, n_threads=n_threads,
-            n_gpu_layers=n_gpu_layers, verbose=False,
-            # Widen the repetition-penalty window well past llama.cpp's default
-            # of 64 tokens, so the penalty can actually "see" - and break out of
-            # - paragraph-length loops that weak models fall into.
-            last_n_tokens_size=320,
-        )
+        loaded_models[filename] = _new_llama(path, n_ctx, n_threads, n_gpu_layers)
     return loaded_models[filename]
 
 
@@ -90,6 +109,17 @@ def unload_model(filename):
 
 def unload_all():
     loaded_models.clear()
+    gc.collect()
+
+
+def unload_all_but_utility():
+    """Free every loaded chat model except the small background one - used
+    before document indexing so the embedder + utility model don't stack on
+    top of a resident 7B/14B and push a low-RAM machine into swap."""
+    utility = config.get_utility_model_filename()
+    for name in list(loaded_models):
+        if name != utility:
+            del loaded_models[name]
     gc.collect()
 
 

@@ -50,7 +50,14 @@ CATALOG = [
         "url": "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
     },
     {
-        "id": "main-14b", "role": "main", "size_label": "14B", "note": "best kvalitet, trenger ~16 GB RAM",
+        "id": "main-14b-compact", "role": "main", "size_label": "14B",
+        "note": "kompakt (Q3), ~10 GB RAM",
+        "filename": "qwen2.5-14b-instruct-q3_k_m.gguf", "display_name": "Qwen2.5 14b (Q3)",
+        "size_bytes": 7_340_000_000,
+        "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q3_K_M.gguf",
+    },
+    {
+        "id": "main-14b", "role": "main", "size_label": "14B", "note": "full (Q4), ~16 GB RAM",
         "filename": "qwen2.5-14b-instruct-q4_k_m.gguf", "display_name": "Qwen2.5 14b",
         "size_bytes": 8_990_000_000,
         "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
@@ -64,7 +71,14 @@ CATALOG = [
         "url": "https://huggingface.co/mradermacher/DeepSeek-R1-Distill-Qwen-7B-Uncensored-i1-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Uncensored.i1-Q5_K_M.gguf",
     },
     {
-        "id": "reason-14b", "role": "reasoning", "size_label": "14B", "note": "best kvalitet, trenger ~16 GB RAM",
+        "id": "reason-14b-compact", "role": "reasoning", "size_label": "14B",
+        "note": "kompakt (Q3), ~10 GB RAM",
+        "filename": "deepseek-r1-distill-qwen-14b-q3_k_m.gguf", "display_name": "DeepSeek R1 14b (Q3)",
+        "size_bytes": 7_340_000_000,
+        "url": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q3_K_M.gguf",
+    },
+    {
+        "id": "reason-14b", "role": "reasoning", "size_label": "14B", "note": "full (Q4), ~16 GB RAM",
         "filename": "deepseek-r1-distill-qwen-14b-q4_k_m.gguf", "display_name": "DeepSeek R1 14b",
         "size_bytes": 8_990_000_000,
         "url": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf",

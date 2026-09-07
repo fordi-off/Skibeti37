@@ -18,8 +18,9 @@ os.makedirs(DOCS_DIR, exist_ok=True)
 
 RETRIEVAL_CHUNK_WORDS = 300
 RETRIEVAL_CHUNK_OVERLAP = 50
-SUMMARY_CHUNK_WORDS = 1200
-MAX_SUMMARY_CHUNKS = 25
+MAX_RETRIEVAL_CHUNKS = 800   # ceiling so a pathologically large file can't stall indexing
+SUMMARY_CHUNK_WORDS = 2400
+MAX_SUMMARY_CHUNKS = 8       # each is one utility-model call - keep the total bounded
 TOP_K_CHUNKS = 5
 
 # Framing text prepended to the retrieved excerpts, read in-context by the
@@ -153,8 +154,16 @@ def add_document(chat_id):
     def status(text):
         runtime.window.evaluate_js(f"onDocStatus({json.dumps(text)})")
 
+    # Indexing needs the embedder + the small utility model. Drop any large
+    # chat model from RAM first so the three don't pile up and push a
+    # low-memory machine into swap (which looks like a freeze).
+    model_manager.unload_all_but_utility()
+
     status(f"Deler opp {filename} for søk...")
     retrieval_chunks = chunk_text(content, RETRIEVAL_CHUNK_WORDS, RETRIEVAL_CHUNK_OVERLAP)
+    truncated_index = len(retrieval_chunks) > MAX_RETRIEVAL_CHUNKS
+    if truncated_index:
+        retrieval_chunks = retrieval_chunks[:MAX_RETRIEVAL_CHUNKS]
     embed_model = model_manager.get_embedder()
 
     chunk_data = []
@@ -197,7 +206,12 @@ def add_document(chat_id):
     chat_store.save_chat_raw(chat_id, chat)
 
     status("")
-    return {"cancelled": False, "documents": list_documents(chat_id)}
+    result = {"cancelled": False, "documents": list_documents(chat_id)}
+    if truncated_index:
+        result["notice"] = (
+            f"«{filename}» er stort - bare de første delene ble indeksert for søk."
+        )
+    return result
 
 
 def attach_existing_document(chat_id, doc_id):

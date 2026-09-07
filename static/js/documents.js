@@ -116,6 +116,7 @@ async function uploadNewDocument() {
     const result = await window.pywebview.api.add_document(chatId);
     if (result && !result.cancelled) {
       refreshDocList();
+      if (result.notice) { docStatusEl.textContent = result.notice; logStatus(`document: ${result.notice}`); }
     } else if (result && result.error) {
       docStatusEl.textContent = result.error;
     }

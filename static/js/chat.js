@@ -620,6 +620,14 @@ async function onDone(info) {
     removeContinueButton(s);
   }
 
+  if (info && info.trimmed && !s.contentEl.querySelector(".gen-note")) {
+    const note = document.createElement("div");
+    note.className = "gen-note";
+    note.textContent = "Meldingen var for lang for kontekstvinduet — eldre meldinger eller deler av teksten ble utelatt. Øk kontekstvinduet i Innstillinger for mer plass.";
+    s.contentEl.appendChild(note);
+    logStatus("prompt trimmed to fit context window");
+  }
+
   if (info && typeof info.context_used === "number") {
     updateContextMeter(info.context_used, info.context_max, info.compressed);
   }

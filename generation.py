@@ -36,6 +36,40 @@ def _looks_looped(text):
     tail = text[-_LOOP_WINDOW:]
     return text.count(tail) >= _LOOP_THRESHOLD
 
+
+def _fit_to_context(llm, messages, context_max, response_reserve):
+    """Make sure the prompt leaves room for the reply. Without this a long
+    pasted article or a big document context can exceed n_ctx - llama.cpp
+    then either errors or spends minutes prefilling with nothing on screen,
+    which reads as a freeze. Returns (messages, trimmed?)."""
+    budget = max(512, context_max - response_reserve - 64)
+    if chats.count_tokens(llm, messages) <= budget:
+        return messages, False
+
+    system, rest = messages[0], list(messages[1:])
+    # Drop whole turns from the oldest end, but always keep the final message.
+    while len(rest) > 1 and chats.count_tokens(llm, [system] + rest) > budget:
+        rest.pop(0)
+    msgs = [system] + rest
+
+    _CUT = "\n\n[...forkortet for a passe kontekstvinduet...]"
+
+    # Still over: the system block (persona + skills + document excerpts) is
+    # itself too big. Keep the head, cut the tail (the excerpts sit last).
+    if chats.count_tokens(llm, msgs) > budget:
+        over = chats.count_tokens(llm, msgs) - budget
+        keep = max(400, len(system["content"]) - over * 4 - len(_CUT) - 400)
+        msgs[0] = {"role": "system", "content": system["content"][:keep].rstrip() + _CUT}
+
+    # Last resort: a single giant message. Trim it by characters, head kept.
+    if chats.count_tokens(llm, msgs) > budget and len(msgs) > 1:
+        head_tokens = chats.count_tokens(llm, msgs[:-1])
+        room_chars = max(400, (budget - head_tokens) * 4 - len(_CUT) - 400)
+        last = msgs[-1]
+        msgs[-1] = {**last, "content": last["content"][:room_chars].rstrip() + _CUT}
+
+    return msgs, True
+
 # Reasoning models emit a <think> block and need more room before the answer.
 REASONING_MAX_TOKENS = 3000
 DEFAULT_MAX_TOKENS = 2000
@@ -79,9 +113,11 @@ def _spawn(model_name, messages, chat_id, continuation):
 
 
 def _stream_and_report(llm, final_messages, meta, model_name):
-    context_used = chats.count_tokens(llm, final_messages)
     context_max = config.load_config().get("context_window", config.DEFAULT_CONTEXT)
     max_tokens = REASONING_MAX_TOKENS if _is_reasoning_model(model_name) else DEFAULT_MAX_TOKENS
+
+    final_messages, trimmed = _fit_to_context(llm, final_messages, context_max, max_tokens)
+    context_used = chats.count_tokens(llm, final_messages)
 
     finish_reason = None
     stopped = _stop_event.is_set()
@@ -114,6 +150,7 @@ def _stream_and_report(llm, final_messages, meta, model_name):
         "truncated": finish_reason == "length",
         "stopped": stopped,
         "looped": looped,
+        "trimmed": trimmed,
         "compressed": meta.get("compressed", False),
         "doc_sources": meta.get("doc_sources", []),
         "context_used": context_used,
