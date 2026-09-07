@@ -310,14 +310,14 @@ again next time you want them — nothing stays on globally.
 define several commands:
 
 ```markdown
-# Skrivehjelp
+# Writing
 
-## /humanize  Fjern AI-preg – skriv naturlig og direkte
+## /humanize  Strip the AI-slop; write plainly and directly
 The full instruction the model follows for this command. Everything
 down to the next "## /..." heading (or the end of the file) is the
 instruction body.
 
-## /kort
+## /shorten
 Description on its own first line if you didn't put it on the ## line.
 
 The instruction body for this one.
@@ -325,12 +325,14 @@ The instruction body for this one.
 
 `# Name` is the skill's display name. Each `## /command` starts a
 command; its description is the rest of that line, or the first line
-under it. Drop a new `.md` file into `skills/` (or edit one) and the
-panel and autocomplete pick it up within a few seconds — no restart.
-The ↻ button forces an immediate refresh.
+under it. Keep the command names and descriptions in English — the
+instructions are what shape the reply, and the models follow English
+instructions more reliably. Drop a new `.md` file into `skills/` (or
+edit one) and the panel and autocomplete pick it up within a few
+seconds — no restart. The ↻ button forces an immediate refresh.
 
-Three skill files are bundled: **writing.md** (`/humanize`, `/kort`,
-`/enkelt`), **language.md** (`/norsk`, `/korrektur`), **tutor.md**
+Three skill files are bundled: **writing.md** (`/humanize`, `/shorten`,
+`/simple`), **language.md** (`/norwegian`, `/proofread`), **tutor.md**
 (`/tutor`).
 
 ### Formatting

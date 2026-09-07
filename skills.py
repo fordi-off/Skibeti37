@@ -30,9 +30,9 @@ os.makedirs(SKILLS_DIR, exist_ok=True)
 _COMMAND_HEADING = re.compile(r"^##\s+/([A-Za-z0-9_-]+)[ \t]*(.*)$")
 
 
-WRITING_SKILL = """# Skrivehjelp
+WRITING_SKILL = """# Writing
 
-## /humanize  Fjern AI-preg – skriv naturlig og direkte
+## /humanize  Strip the AI-slop; write plainly and directly
 Write like a knowledgeable person explaining something directly to another person - not like marketing copy or a generic AI summary. This applies regardless of which language you are responding in (English, Norwegian, or any other). Avoid these specific habits, which are well-documented hallmarks of typical AI-generated text:
 
 WORD CHOICES TO AVOID (unless the word is genuinely the most precise choice):
@@ -74,7 +74,7 @@ Don't open with "Certainly!" or "I'd be happy to!", don't close with "I hope thi
 
 The goal is not to mechanically avoid these things at all costs, but to write naturally, precisely and directly - the way a person who actually knows the subject would, in whichever language you're responding in.
 
-## /kort  Stram inn svaret til det viktigste
+## /shorten  Cut the reply down to what actually matters
 Answer in as few words as the question honestly allows.
 
 - Cut throat-clearing, filler transitions and any restatement of the question.
@@ -84,7 +84,7 @@ Answer in as few words as the question honestly allows.
 
 Reply in whatever language the person is using.
 
-## /enkelt  Forklar som til en smart 12-åring
+## /simple  Explain it like I'm a smart 12-year-old
 Explain things as if to a curious 12-year-old who is smart but new to the topic.
 
 - Short sentences. One idea per sentence.
@@ -97,16 +97,16 @@ Don't oversimplify to the point of being wrong. Reply in whatever language the p
 """
 
 
-LANGUAGE_SKILL = """# Språk
+LANGUAGE_SKILL = """# Language
 
-## /norsk  Svar på klar, korrekt bokmål
+## /norwegian  Answer in clear, correct Norwegian (bokmål)
 Reply in Norwegian bokmål for this message, even if the question is written in another language.
 
 - Natural, idiomatic Norwegian - not a word-for-word translation.
 - Plain and clear: everyday words over bureaucratic ones, reasonably short sentences.
 - Keep technical terms that have no good Norwegian equivalent, but explain them the first time.
 
-## /korrektur  Korrekturles norsk tekst, behold stemmen
+## /proofread  Proofread Norwegian text, keep the author's voice
 Use this to proofread or improve a piece of Norwegian text.
 
 - Fix spelling, grammar, punctuation and clearly awkward phrasing.
@@ -121,7 +121,7 @@ If the text is already clean, say so instead of inventing changes.
 
 TUTOR_SKILL = """# Tutor
 
-## /tutor  Veiled steg for steg, ikke gi fasiten
+## /tutor  Guide step by step instead of giving the answer
 Act as a patient tutor, not an answer key. The person is trying to learn, so do not hand over the finished solution.
 
 - Break the problem into smaller steps and work through one at a time.

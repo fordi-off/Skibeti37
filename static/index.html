@@ -114,20 +114,21 @@
           Brukeren skriver f.eks. <code>/humanize</code> først i en melding, og kommandoens
           instruksjon legges til for det ene svaret. Formatet:
         </div>
-        <pre class="skill-format-example"># Navn på skillen (vises her)
+        <div class="settings-note" style="margin-top:-6px;">Skriv kommandonavn og beskrivelser på engelsk – modellene følger engelske instruksjoner mest presist.</div>
+        <pre class="skill-format-example"># Skill name (shown here)
 
-## /kommando  Kort beskrivelse som vises i /-menyen
-Instruksjonen modellen skal følge for denne kommandoen.
-Alt fram til neste "## /..." (eller slutten av fila) hører med.
+## /command  Short description shown in the / menu
+The instruction the model follows for this command.
+Everything down to the next "## /..." (or end of file) belongs to it.
 
-## /neste-kommando
-Beskrivelse på egen linje hvis du ikke skrev den på ##-linja.
+## /next-command
+Description on its own first line if not on the ## line.
 
-Instruksjonen for denne.</pre>
+The instruction for this one.</pre>
         <div id="settings-skill-list"></div>
         <div class="settings-add-form">
-          <input id="new-skill-name" type="text" placeholder="Navn på skillen (f.eks. Skrivehjelp)" />
-          <textarea id="new-skill-content" placeholder="## /kommando  Kort beskrivelse&#10;Instruksjonen modellen skal følge...&#10;&#10;## /kommando-to  ...&#10;..."></textarea>
+          <input id="new-skill-name" type="text" placeholder="Navn på skillen (f.eks. Writing)" />
+          <textarea id="new-skill-content" placeholder="## /command  Short description&#10;The instruction the model should follow...&#10;&#10;## /second-command  ...&#10;..."></textarea>
           <div id="new-skill-error" class="skill-add-error hidden"></div>
           <button id="new-skill-save-btn">Legg til skill</button>
         </div>

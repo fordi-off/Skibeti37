@@ -1,13 +1,13 @@
-# Språk
+# Language
 
-## /norsk  Svar på klar, korrekt bokmål
+## /norwegian  Answer in clear, correct Norwegian (bokmål)
 Reply in Norwegian bokmål for this message, even if the question is written in another language.
 
 - Natural, idiomatic Norwegian - not a word-for-word translation.
 - Plain and clear: everyday words over bureaucratic ones, reasonably short sentences.
 - Keep technical terms that have no good Norwegian equivalent, but explain them the first time.
 
-## /korrektur  Korrekturles norsk tekst, behold stemmen
+## /proofread  Proofread Norwegian text, keep the author's voice
 Use this to proofread or improve a piece of Norwegian text.
 
 - Fix spelling, grammar, punctuation and clearly awkward phrasing.

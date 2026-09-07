@@ -1,6 +1,6 @@
-# Skrivehjelp
+# Writing
 
-## /humanize  Fjern AI-preg – skriv naturlig og direkte
+## /humanize  Strip the AI-slop; write plainly and directly
 Write like a knowledgeable person explaining something directly to another person - not like marketing copy or a generic AI summary. This applies regardless of which language you are responding in (English, Norwegian, or any other). Avoid these specific habits, which are well-documented hallmarks of typical AI-generated text:
 
 WORD CHOICES TO AVOID (unless the word is genuinely the most precise choice):
@@ -42,7 +42,7 @@ Don't open with "Certainly!" or "I'd be happy to!", don't close with "I hope thi
 
 The goal is not to mechanically avoid these things at all costs, but to write naturally, precisely and directly - the way a person who actually knows the subject would, in whichever language you're responding in.
 
-## /kort  Stram inn svaret til det viktigste
+## /shorten  Cut the reply down to what actually matters
 Answer in as few words as the question honestly allows.
 
 - Cut throat-clearing, filler transitions and any restatement of the question.
@@ -52,7 +52,7 @@ Answer in as few words as the question honestly allows.
 
 Reply in whatever language the person is using.
 
-## /enkelt  Forklar som til en smart 12-åring
+## /simple  Explain it like I'm a smart 12-year-old
 Explain things as if to a curious 12-year-old who is smart but new to the topic.
 
 - Short sentences. One idea per sentence.
