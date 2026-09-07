@@ -11,6 +11,7 @@ import threading
 import time
 import urllib.request
 
+import applog
 import config
 import runtime
 
@@ -182,9 +183,12 @@ def _download_one(entry, on_progress):
 
 def _run(entries):
     global _thread
+    applog.log(f"download queue ({len(entries)}): {', '.join(e['id'] for e in entries)}")
     for entry in entries:
         if _cancel.is_set():
             break
+        applog.log(f"downloading {entry['filename']} "
+                   f"(~{entry.get('size_bytes', 0) / 1e9:.1f} GB) ...")
         _state["current"] = {
             "id": entry["id"], "name": entry["display_name"], "filename": entry["filename"],
             "downloaded": 0, "total": entry.get("size_bytes", 0), "speed": 0.0,
@@ -200,10 +204,14 @@ def _run(entries):
             if result in ("done", "already"):
                 _register_in_config(entry)
                 _state["completed"].append(entry["id"])
+                applog.log(f"downloaded {entry['filename']}"
+                           + (" (already on disk)" if result == "already" else ""))
             elif result == "cancelled":
+                applog.log("download cancelled")
                 break
         except Exception as exc:  # network, disk, SSL...
             _state["failed"].append({"id": entry["id"], "name": entry["display_name"], "error": str(exc)})
+            applog.error(f"download failed for {entry['id']}: {exc}")
 
         _state["queue"] = [q for q in _state["queue"] if q != entry["id"]]
         _emit()
@@ -215,6 +223,8 @@ def _run(entries):
         _state["phase"] = "error"
     else:
         _state["phase"] = "done"
+    applog.log(f"download queue finished: {_state['phase']} "
+               f"({len(_state['completed'])} ok, {len(_state['failed'])} failed)")
     _emit()
     _thread = None
 

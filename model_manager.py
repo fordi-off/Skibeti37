@@ -6,8 +6,10 @@ in RAM at once."""
 import ctypes
 import gc
 import os
+import time
 from llama_cpp import Llama
 
+import applog
 import config
 
 loaded_models = {}
@@ -81,6 +83,7 @@ def _new_llama(path, n_ctx, n_threads, n_gpu_layers):
         # quality loss; lets bigger models / longer contexts fit in RAM.
         return Llama(**common, type_k=8, type_v=8)
     except Exception:
+        applog.log("KV-cache quantization unavailable - using fp16 cache")
         return Llama(**common)
 
 
@@ -96,7 +99,12 @@ def get_model(filename):
         n_gpu_layers = -1 if device == "gpu" else 0
         n_ctx = cfg.get("context_window", config.DEFAULT_CONTEXT)
         n_threads = cfg.get("n_threads", config.DEFAULT_THREADS)
+        gb = os.path.getsize(path) / 1e9
+        applog.log(f"loading model: {filename} ({gb:.1f} GB, ctx {n_ctx}, {device}) ...")
+        t0 = time.time()
         loaded_models[filename] = _new_llama(path, n_ctx, n_threads, n_gpu_layers)
+        applog.log(f"model ready: {filename} in {time.time() - t0:.1f}s "
+                   f"(resident: {len(loaded_models)})")
     return loaded_models[filename]
 
 
@@ -105,9 +113,12 @@ def unload_model(filename):
     if filename in loaded_models and filename != utility:
         del loaded_models[filename]
         gc.collect()
+        applog.log(f"unloaded model: {filename}")
 
 
 def unload_all():
+    if loaded_models:
+        applog.log(f"unloading all models ({len(loaded_models)})")
     loaded_models.clear()
     gc.collect()
 
@@ -117,10 +128,12 @@ def unload_all_but_utility():
     before document indexing so the embedder + utility model don't stack on
     top of a resident 7B/14B and push a low-RAM machine into swap."""
     utility = config.get_utility_model_filename()
-    for name in list(loaded_models):
-        if name != utility:
-            del loaded_models[name]
-    gc.collect()
+    freed = [n for n in loaded_models if n != utility]
+    for name in freed:
+        del loaded_models[name]
+    if freed:
+        gc.collect()
+        applog.log(f"unloaded for indexing: {', '.join(freed)}")
 
 
 def remove_model(filename):
@@ -154,10 +167,13 @@ def get_embedder():
                 "Download nomic-embed-text-v1.5.Q4_K_M.gguf into the models/ folder."
             )
         n_threads = config.load_config().get("n_threads", config.DEFAULT_THREADS)
+        applog.log("loading embedder ...")
+        t0 = time.time()
         embedder = Llama(
             model_path=config.EMBED_MODEL_PATH, embedding=True,
             n_ctx=2048, n_threads=n_threads, verbose=False
         )
+        applog.log(f"embedder ready in {time.time() - t0:.1f}s")
     return embedder
 
 

@@ -4,7 +4,9 @@ the model works."""
 
 import json
 import threading
+import time
 
+import applog
 import chats
 import config
 import model_manager
@@ -118,10 +120,16 @@ def _stream_and_report(llm, final_messages, meta, model_name):
 
     final_messages, trimmed = _fit_to_context(llm, final_messages, context_max, max_tokens)
     context_used = chats.count_tokens(llm, final_messages)
+    applog.log(f"generating: {model_name} | {context_used}/{context_max} ctx tokens"
+               + (" | prompt trimmed to fit" if trimmed else "")
+               + (" | history compressed" if meta.get("compressed") else "")
+               + (f" | {len(meta.get('doc_sources', []))} doc excerpts" if meta.get("doc_sources") else ""))
 
     finish_reason = None
     stopped = _stop_event.is_set()
     looped = False
+    t0 = time.time()
+    n_tokens = 0
 
     if not stopped:
         stream = llm.create_chat_completion(
@@ -136,6 +144,7 @@ def _stream_and_report(llm, final_messages, meta, model_name):
             choice = chunk["choices"][0]
             delta = choice["delta"].get("content", "")
             if delta:
+                n_tokens += 1
                 answer += delta
                 runtime.window.evaluate_js(f"onChunk({json.dumps(delta)})")
                 if len(answer) - checked_at >= 120:
@@ -145,6 +154,11 @@ def _stream_and_report(llm, final_messages, meta, model_name):
                         break
             if choice.get("finish_reason"):
                 finish_reason = choice["finish_reason"]
+
+    dt = max(time.time() - t0, 1e-6)
+    outcome = ("looped" if looped else "stopped" if stopped
+               else "cut (length)" if finish_reason == "length" else "ok")
+    applog.log(f"done: {n_tokens} tokens in {dt:.1f}s ({n_tokens / dt:.1f} tok/s) - {outcome}")
 
     info = {
         "truncated": finish_reason == "length",
@@ -174,4 +188,5 @@ def _generate(model_name, messages, chat_id=None, continuation=False):
         final_messages, meta = chats.build_context(chat_id, model_name, msgs)
         _stream_and_report(llm, final_messages, meta, model_name)
     except Exception as e:
+        applog.error(f"generation failed: {e}")
         runtime.window.evaluate_js(f"onError({json.dumps(str(e))})")

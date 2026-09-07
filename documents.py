@@ -8,6 +8,7 @@ import uuid
 import numpy as np
 import webview
 
+import applog
 import chat_store
 import config
 import model_manager
@@ -150,6 +151,7 @@ def add_document(chat_id):
     filename = os.path.basename(filepath)
     with open(filepath, encoding="utf-8", errors="ignore") as f:
         content = f.read()
+    applog.log(f"indexing document: {filename} ({len(content)} chars)")
 
     def status(text):
         runtime.window.evaluate_js(f"onDocStatus({json.dumps(text)})")
@@ -164,8 +166,10 @@ def add_document(chat_id):
     truncated_index = len(retrieval_chunks) > MAX_RETRIEVAL_CHUNKS
     if truncated_index:
         retrieval_chunks = retrieval_chunks[:MAX_RETRIEVAL_CHUNKS]
+        applog.log(f"  document large - capped at {MAX_RETRIEVAL_CHUNKS} search chunks")
     embed_model = model_manager.get_embedder()
 
+    applog.log(f"  embedding {len(retrieval_chunks)} chunks ...")
     chunk_data = []
     for i, chunk in enumerate(retrieval_chunks):
         status(f"Lager søkeindeks for {filename}: bit {i + 1}/{len(retrieval_chunks)}")
@@ -179,6 +183,7 @@ def add_document(chat_id):
     small = model_manager.get_model(utility_filename)
     partial_summaries = []
 
+    applog.log(f"  summarizing in {len(summary_chunks)} part(s) with {utility_filename} ...")
     for i, chunk in enumerate(summary_chunks):
         status(f"Oppsummerer {filename}: del {i + 1}/{len(summary_chunks)}")
         resp = small.create_chat_completion(
@@ -205,6 +210,7 @@ def add_document(chat_id):
     chat.setdefault("attached_docs", {})[doc_id] = True
     chat_store.save_chat_raw(chat_id, chat)
 
+    applog.log(f"indexed: {filename} -> doc {doc_id[:8]} ({len(chunk_data)} chunks)")
     status("")
     result = {"cancelled": False, "documents": list_documents(chat_id)}
     if truncated_index:

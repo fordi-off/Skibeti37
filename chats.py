@@ -7,6 +7,7 @@ import re
 import time
 import uuid
 
+import applog
 import chat_store
 import config
 import documents
@@ -209,6 +210,7 @@ def build_context(chat_id, model_name, messages):
         new_chunk = history[summarized_count:keep_from]
 
         if new_chunk:
+            applog.log(f"compressing history: folding {len(new_chunk)} older message(s) into the running summary")
             utility_filename = config.get_utility_model_filename()
             small = model_manager.get_model(utility_filename)
             prompt = _summary_prompt(cache.get("summary", ""), new_chunk)

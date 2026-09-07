@@ -4,6 +4,7 @@ between JS calls and the Python functions."""
 
 import json
 
+import applog
 import chats
 import config
 import documents
@@ -59,6 +60,7 @@ class Api:
 
     def delete_model(self, filename):
         """Delete a model's .gguf from disk and forget its settings."""
+        applog.log(f"deleting model file: {filename}")
         model_manager.remove_model(filename)
         cfg = config.load_config()
         cfg.get("models", {}).pop(filename, None)
@@ -92,6 +94,7 @@ class Api:
         cfg["context_window"] = int(value)
         config.save_config(cfg)
         model_manager.unload_all()
+        applog.log(f"context window set to {cfg['context_window']} tokens")
         return {"context_window": cfg["context_window"]}
 
     def set_thread_count(self, value):
@@ -100,12 +103,14 @@ class Api:
         config.save_config(cfg)
         model_manager.unload_all()
         model_manager.reset_embedder()
+        applog.log(f"CPU threads set to {cfg['n_threads']}")
         return {"n_threads": cfg["n_threads"]}
 
     def reset_settings(self):
         config.reset_config()
         model_manager.unload_all()
         model_manager.reset_embedder()
+        applog.log("settings reset to defaults")
         return self.get_settings_overview()
 
     # ---------------- Conversations ----------------
