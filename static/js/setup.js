@@ -148,10 +148,13 @@ function renderProgress(state) {
 async function finishSetup() {
   setupBusy = false;
   setSetupUiLocked(false);
+  logStatus("setup finished - reloading");
   await loadModels();
+  logStatus(`models loaded (${allModels.length})`);
   await refreshChatList();
   await refreshDocList();
   await loadCommands(true);
+  logStatus(`commands loaded (${allCommands.length})`);
   if (conversation.length > 1) renderConversation();
   else chatEl.innerHTML = emptyStateHTML();
 }

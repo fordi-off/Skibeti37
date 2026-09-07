@@ -69,6 +69,9 @@ async function openChat(chatId) {
   conversation = data.messages;
   if (data.model) selectModel(data.model);
 
+  const turns = conversation.filter(m => m.role !== "system").length;
+  logStatus(`chat opened: "${data.name}" (${turns} messages)`);
+
   renderConversation();
   contextMeterEl.classList.remove("visible");
   refreshChatList();
@@ -644,6 +647,7 @@ function onError(message) {
 function onGenPhase(phase) {
   if (!isGenerating) return;
   const label = modelLabels[currentModel] || currentModel;
+  logStatus(phase === "loading" ? `loading model into RAM: ${label}` : `generating: ${label}`);
   statusEl.textContent = phase === "loading"
     ? `laster ${label}... (første gang tar det litt tid)`
     : `genererer med ${label}...`;

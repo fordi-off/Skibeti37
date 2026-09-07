@@ -1,5 +1,14 @@
 marked.setOptions({ breaks: true, gfm: true });
 
+// Lightweight startup / load logging, visible in the WebView dev console.
+function logStatus(msg) {
+  console.log(
+    `%cskibeti37%c ${msg}`,
+    "background:#1C5FB0;color:#fff;padding:1px 6px;border-radius:2px",
+    "color:inherit"
+  );
+}
+
 let allModels = [];          // [{id, name}]
 let modelLabels = {};        // id -> name (short display text)
 let allCommands = [];        // [{command, description, skill}] - slash commands
