@@ -31,8 +31,8 @@ let conversation = [{ role: "system", content: SYSTEM_PROMPT }];
 // renders separately from the answer.
 function isReasoningModel(id) {
   if (!id) return false;
-  return id.toLowerCase().includes("deepseek")
-    || (modelLabels[id] || "").toLowerCase().includes("deepseek");
+  const hay = (id + " " + (modelLabels[id] || "")).toLowerCase();
+  return hay.includes("deepseek") || hay.includes("thinking") || hay.includes("-r1-");
 }
 
 const chatEl = document.getElementById("chat");

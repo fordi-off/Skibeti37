@@ -21,68 +21,63 @@ CHUNK = 256 * 1024
 # role: embed | utility | main | reasoning
 #   embed + utility  -> always downloaded (auto)
 #   main + reasoning -> user picks a size, or skips
+#
+# Main + utility are Qwen3.5 (2026). The plain Qwen3/3.5 models are "hybrid" -
+# they can think or answer directly; generation.py sends /no_think for the chat
+# slot. The reasoning slot uses single-mode models (Qwen3-*-Thinking, the
+# DeepSeek-R1 distill) whose names encode "thinking"/"deepseek" so the app can
+# tell them apart. Older Qwen2.5 / DeepSeek .gguf files keep working.
+_HF = "https://huggingface.co"
 CATALOG = [
     {
         "id": "embed", "role": "embed",
         "filename": "nomic-embed-text-v1.5.Q4_K_M.gguf",
         "display_name": "nomic-embed-text v1.5",
         "size_bytes": 84_000_000,
-        "url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf",
+        "url": f"{_HF}/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf",
     },
     {
         "id": "utility", "role": "utility",
-        "filename": "qwen2.5-1.5b-instruct-q5_k_m.gguf",
-        "display_name": "Qwen2.5 1.5b",
-        "size_bytes": 1_290_000_000,
-        "url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q5_k_m.gguf",
+        "filename": "Qwen_Qwen3.5-2B-Q5_K_M.gguf",
+        "display_name": "Qwen3.5 2b",
+        "size_bytes": 1_568_476_256,
+        "url": f"{_HF}/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q5_K_M.gguf",
     },
 
-    # --- main model: choose a size ---
+    # --- main model (normal chat): choose a size ---
     {
-        "id": "main-3b", "role": "main", "size_label": "3B", "note": "raskest, minst minne",
-        "filename": "qwen2.5-3b-instruct-q4_k_m.gguf", "display_name": "Qwen2.5 3b",
-        "size_bytes": 1_930_000_000,
-        "url": "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+        "id": "main-4b", "role": "main", "size_label": "4B", "note": "raskest, minst minne",
+        "filename": "Qwen_Qwen3.5-4B-Q4_K_M.gguf", "display_name": "Qwen3.5 4b",
+        "size_bytes": 3_013_027_808,
+        "url": f"{_HF}/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
     },
     {
-        "id": "main-7b", "role": "main", "size_label": "7B", "default": True, "note": "anbefalt",
-        "filename": "qwen2.5-7b-instruct-q4_k_m.gguf", "display_name": "Qwen2.5 7b",
-        "size_bytes": 4_680_000_000,
-        "url": "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+        "id": "main-9b", "role": "main", "size_label": "9B", "default": True, "note": "anbefalt, ~8 GB RAM",
+        "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf", "display_name": "Qwen3.5 9b",
+        "size_bytes": 6_169_341_984,
+        "url": f"{_HF}/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/main/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
     },
     {
-        "id": "main-14b-compact", "role": "main", "size_label": "14B",
-        "note": "kompakt (Q3), ~10 GB RAM",
-        "filename": "qwen2.5-14b-instruct-q3_k_m.gguf", "display_name": "Qwen2.5 14b (Q3)",
-        "size_bytes": 7_340_000_000,
-        "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q3_K_M.gguf",
+        "id": "main-9b-compact", "role": "main", "size_label": "9B", "note": "kompakt (Q3), ~7 GB RAM",
+        "filename": "Qwen_Qwen3.5-9B-Q3_K_M.gguf", "display_name": "Qwen3.5 9b (Q3)",
+        "size_bytes": 5_178_748_960,
+        "url": f"{_HF}/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/main/Qwen_Qwen3.5-9B-Q3_K_M.gguf",
+    },
+
+    # --- reasoning model (math / logic, shows its thinking): choose a size ---
+    {
+        "id": "reason-4b", "role": "reasoning", "size_label": "4B", "default": True,
+        "note": "raskest",
+        "filename": "Qwen_Qwen3-4B-Thinking-2507-Q4_K_M.gguf", "display_name": "Qwen3 4b (tenkning)",
+        "size_bytes": 2_497_280_736,
+        "url": f"{_HF}/bartowski/Qwen_Qwen3-4B-Thinking-2507-GGUF/resolve/main/Qwen_Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
     },
     {
-        "id": "main-14b", "role": "main", "size_label": "14B", "note": "full (Q4), ~16 GB RAM",
-        "filename": "qwen2.5-14b-instruct-q4_k_m.gguf", "display_name": "Qwen2.5 14b",
-        "size_bytes": 8_990_000_000,
-        "url": "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
-    },
-    # --- reasoning model: choose a size ---
-    {
-        "id": "reason-7b", "role": "reasoning", "size_label": "7B", "default": True,
-        "note": "anbefalt (uncensored)",
-        "filename": "DeepSeek-R1-Distill-Qwen-7B-Uncensored.i1-Q5_K_M.gguf", "display_name": "DeepSeek R1",
-        "size_bytes": 5_440_000_000,
-        "url": "https://huggingface.co/mradermacher/DeepSeek-R1-Distill-Qwen-7B-Uncensored-i1-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Uncensored.i1-Q5_K_M.gguf",
-    },
-    {
-        "id": "reason-14b-compact", "role": "reasoning", "size_label": "14B",
-        "note": "kompakt (Q3), ~10 GB RAM",
-        "filename": "deepseek-r1-distill-qwen-14b-q3_k_m.gguf", "display_name": "DeepSeek R1 14b (Q3)",
-        "size_bytes": 7_340_000_000,
-        "url": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q3_K_M.gguf",
-    },
-    {
-        "id": "reason-14b", "role": "reasoning", "size_label": "14B", "note": "full (Q4), ~16 GB RAM",
-        "filename": "deepseek-r1-distill-qwen-14b-q4_k_m.gguf", "display_name": "DeepSeek R1 14b",
-        "size_bytes": 8_990_000_000,
-        "url": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf",
+        "id": "reason-8b", "role": "reasoning", "size_label": "8B", "note": "anbefalt, sterk pa matte",
+        "filename": "deepseek-ai_DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf",
+        "display_name": "DeepSeek R1 (Qwen3 8b)",
+        "size_bytes": 5_027_783_040,
+        "url": f"{_HF}/bartowski/deepseek-ai_DeepSeek-R1-0528-Qwen3-8B-GGUF/resolve/main/deepseek-ai_DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf",
     },
 ]
 

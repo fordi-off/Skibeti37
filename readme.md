@@ -123,15 +123,26 @@ pip install pywebview numpy
 without the base models, the chat area shows a small **"Kom i gang"**
 panel:
 
-- **nomic-embed-text v1.5** (document search) and **Qwen2.5 1.5B**
-  (fast chat + the background model for summaries/compression) download
+- **nomic-embed-text v1.5** (document search) and **Qwen3.5 2B**
+  (the background model for summaries/compression) download
   automatically — no choice.
-- **Hovedmodell** — pick a size for the normal chat model: Qwen2.5
-  **3B**, **7B** (default), or **14B**, or "Ingen".
-- **Resonneringsmodell** — pick a size for matte/logikk: DeepSeek-R1
-  Distill **7B** (default, uncensored) or **14B**, or "Ingen".
+- **Hovedmodell** — pick a size for the normal chat model: Qwen3.5
+  **4B** or **9B** (default; full Q4 ~8 GB RAM, or compact Q3 ~7 GB),
+  or "Ingen". The 9B is the sweet spot — noticeably stronger than an
+  8B, still runs where a 14B won't.
+- **Resonneringsmodell** — pick a size for matte/logikk:
+  **Qwen3 4B-Thinking** (default) or **DeepSeek-R1 (Qwen3 8B)**, or
+  "Ingen".
 - **Hopp over** downloads only the two automatic files and drops you
   into the app; add your own `.gguf` files to `models/` whenever.
+
+The plain Qwen3.5 models are "hybrid" — they can reason step by step or
+answer directly. The app sends `/no_think` for the chat slot so replies
+are fast; the reasoning slot uses dedicated `-Thinking` / DeepSeek-R1
+models. Older Qwen2.5 / DeepSeek `.gguf` files you already have keep
+working. Bigger options exist (Qwen3.5-27B, the 35B-A3B MoE) but need
+16–24 GB RAM — add those `.gguf` files by hand if your machine has the
+headroom.
 
 Downloads run one at a time with a live progress bar, speed and ETA, and
 resume from where they stopped (`.part` file) if interrupted. The panel is
@@ -244,10 +255,12 @@ it recomputes the context estimate.
 
 ### Reasoning models
 
-DeepSeek-R1 wraps its chain-of-thought in `<think>...</think>`. That
-part is shown live in a collapsible **Tankegang** block that folds away
-once the answer is done — click it to read the reasoning. Only the
-answer is saved to the conversation.
+The reasoning models (Qwen3-Thinking, DeepSeek-R1) wrap their
+chain-of-thought in `<think>...</think>`. That part is shown live in a
+collapsible **Tankegang** block that folds away once the answer is done
+— click it to read the reasoning. Only the answer is saved to the
+conversation. The block also opens if a hybrid Qwen model emits
+`<think>` even though it wasn't picked as the reasoning model.
 
 ### Speed display
 
@@ -514,10 +527,12 @@ it stops with a message telling you how much is needed, instead of
 letting `llama.cpp` hard-crash the whole app. Close other programs, pick
 a smaller model, or lower the context window.
 
-**DeepSeek-R1 and Norwegian are a bad combination.** Its `<think>`
-reasoning is trained heavily on English and becomes unreliable in
-Norwegian. Use DeepSeek for English reasoning tasks; use Qwen2.5-7B for
-Norwegian.
+**DeepSeek-R1 and Norwegian are a weak combination.** Its `<think>`
+reasoning leans heavily on English. For Norwegian maths/logic the
+Qwen3-Thinking model holds the language better; keep DeepSeek for
+English reasoning tasks. The firm `LANGUAGE:` line added to every
+prompt (see `chats.py`) mostly holds either model to the user's
+language now, but the effect is still weaker inside `<think>`.
 
 **Repetition penalty and language slips.** An overly aggressive
 `frequency_penalty` was found to push Qwen models into code-switching

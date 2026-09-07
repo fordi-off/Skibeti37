@@ -73,7 +73,8 @@ def _fit_to_context(llm, messages, context_max, response_reserve):
     return msgs, True
 
 # Reasoning models emit a <think> block and need more room before the answer.
-REASONING_MAX_TOKENS = 3000
+# Qwen3-Thinking in particular can be long-winded inside <think>.
+REASONING_MAX_TOKENS = 4000
 DEFAULT_MAX_TOKENS = 2000
 
 CONTINUATION_PROMPT = (
@@ -88,7 +89,31 @@ _stop_event = threading.Event()
 
 
 def _is_reasoning_model(model_name):
-    return "deepseek" in model_name.lower()
+    """A model whose replies contain a <think> block: the DeepSeek-R1 distills
+    and Qwen3's dedicated *-Thinking* variants."""
+    low = model_name.lower()
+    return "deepseek" in low or "-r1-" in low or "thinking" in low
+
+
+def _thinking_tag(model_name):
+    """Plain Qwen3 models are hybrid - think or answer directly. Steer them
+    explicitly: /no_think in the chat slot, /think in the reasoning slot. The
+    single-mode 2507 variants, the DeepSeek distill and non-Qwen3 models all
+    just ignore the token."""
+    if "qwen3" not in model_name.lower():
+        return None
+    return "/think" if _is_reasoning_model(model_name) else "/no_think"
+
+
+def _apply_thinking_tag(final_messages, model_name):
+    tag = _thinking_tag(model_name)
+    if not tag:
+        return
+    for m in reversed(final_messages):
+        if m["role"] == "user":
+            if not m["content"].rstrip().endswith(tag):
+                m["content"] = m["content"].rstrip() + " " + tag
+            return
 
 
 def stop():
@@ -186,6 +211,7 @@ def _generate(model_name, messages, chat_id=None, continuation=False):
         if phase == "loading":
             runtime.window.evaluate_js('onGenPhase("generating")')
         final_messages, meta = chats.build_context(chat_id, model_name, msgs)
+        _apply_thinking_tag(final_messages, model_name)
         _stream_and_report(llm, final_messages, meta, model_name)
     except Exception as e:
         applog.error(f"generation failed: {e}")
