@@ -544,10 +544,23 @@ function onChunk(delta) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
+// Mirrors _looks_looped in generation.py: if a long span repeats, keep only
+// the text up to the end of its first occurrence.
+function trimRepeatedTail(text, window = 180) {
+  if (text.length < window * 3) return text;
+  const tail = text.slice(-window);
+  const first = text.indexOf(tail);
+  if (first !== -1 && first < text.length - window) {
+    return text.slice(0, first + window).replace(/\s+$/, "");
+  }
+  return text;
+}
+
 async function onDone(info) {
   const s = window._streamState;
   const truncated = !!(info && info.truncated);
   const stopped = !!(info && info.stopped);
+  const looped = !!(info && info.looped);
 
   // Stopped before any text arrived: drop the empty assistant bubble entirely.
   if (stopped && !s.isContinuation && s.answerBuffer.trim() === "") {
@@ -555,6 +568,14 @@ async function onDone(info) {
     if (msgEl) msgEl.remove();
     exitGeneratingUI();
     return;
+  }
+
+  // A degenerate loop was cut off mid-repeat - drop the repeated tail so the
+  // saved message keeps only the first, non-repeating pass.
+  if (looped) {
+    s.answerBuffer = trimRepeatedTail(s.answerBuffer);
+    const answerEl = s.contentEl.querySelector(".answer-text");
+    if (answerEl) answerEl.innerHTML = formatInline(s.answerBuffer);
   }
 
   if (s.isContinuation) {
@@ -571,7 +592,19 @@ async function onDone(info) {
     s.metaTextEl.textContent = `${s.metaBase} · ${elapsed.toFixed(1)}s · ${speed.toFixed(1)} tok/s`;
   }
 
-  if (truncated || stopped) { showContinueButton(s, stopped); } else { removeContinueButton(s); }
+  if (looped) {
+    removeContinueButton(s);
+    if (!s.contentEl.querySelector(".gen-note")) {
+      const note = document.createElement("div");
+      note.className = "gen-note";
+      note.textContent = "Svaret begynte å gjenta seg selv, så det ble stoppet. Prøv å regenerere eller still spørsmålet på nytt.";
+      s.contentEl.appendChild(note);
+    }
+  } else if (truncated || stopped) {
+    showContinueButton(s, stopped);
+  } else {
+    removeContinueButton(s);
+  }
 
   if (info && typeof info.context_used === "number") {
     updateContextMeter(info.context_used, info.context_max, info.compressed);

@@ -72,7 +72,11 @@ def get_model(filename):
         n_threads = cfg.get("n_threads", config.DEFAULT_THREADS)
         loaded_models[filename] = Llama(
             model_path=path, n_ctx=n_ctx, n_threads=n_threads,
-            n_gpu_layers=n_gpu_layers, verbose=False
+            n_gpu_layers=n_gpu_layers, verbose=False,
+            # Widen the repetition-penalty window well past llama.cpp's default
+            # of 64 tokens, so the penalty can actually "see" - and break out of
+            # - paragraph-length loops that weak models fall into.
+            last_n_tokens_size=320,
         )
     return loaded_models[filename]
 

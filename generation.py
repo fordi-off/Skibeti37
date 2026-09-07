@@ -12,9 +12,29 @@ import runtime
 
 SAMPLING_PARAMS = {
     "temperature": 0.6,
-    "repeat_penalty": 1.1,
-    "frequency_penalty": 0.05,
+    "top_p": 0.95,
+    # repeat_penalty acts over the last last_n_tokens_size tokens (320, set in
+    # model_manager). presence_penalty is a flat one-off nudge that helps break
+    # loops without escalating per token the way a high frequency_penalty does -
+    # frequency_penalty is kept low on purpose (Qwen code-switches to Chinese
+    # when common words get too "expensive" to repeat).
+    "repeat_penalty": 1.18,
+    "frequency_penalty": 0.1,
+    "presence_penalty": 0.3,
 }
+
+# If the same long span of text keeps coming back, the model has degenerated
+# into a loop - stop the stream instead of filling the whole token budget with
+# repeats.
+_LOOP_WINDOW = 180
+_LOOP_THRESHOLD = 3
+
+
+def _looks_looped(text):
+    if len(text) < _LOOP_WINDOW * _LOOP_THRESHOLD:
+        return False
+    tail = text[-_LOOP_WINDOW:]
+    return text.count(tail) >= _LOOP_THRESHOLD
 
 # Reasoning models emit a <think> block and need more room before the answer.
 REASONING_MAX_TOKENS = 3000
@@ -65,11 +85,14 @@ def _stream_and_report(llm, final_messages, meta, model_name):
 
     finish_reason = None
     stopped = _stop_event.is_set()
+    looped = False
 
     if not stopped:
         stream = llm.create_chat_completion(
             messages=final_messages, max_tokens=max_tokens, stream=True, **SAMPLING_PARAMS
         )
+        answer = ""
+        checked_at = 0
         for chunk in stream:
             if _stop_event.is_set():
                 stopped = True
@@ -77,13 +100,20 @@ def _stream_and_report(llm, final_messages, meta, model_name):
             choice = chunk["choices"][0]
             delta = choice["delta"].get("content", "")
             if delta:
+                answer += delta
                 runtime.window.evaluate_js(f"onChunk({json.dumps(delta)})")
+                if len(answer) - checked_at >= 120:
+                    checked_at = len(answer)
+                    if _looks_looped(answer):
+                        looped = True
+                        break
             if choice.get("finish_reason"):
                 finish_reason = choice["finish_reason"]
 
     info = {
         "truncated": finish_reason == "length",
         "stopped": stopped,
+        "looped": looped,
         "compressed": meta.get("compressed", False),
         "doc_sources": meta.get("doc_sources", []),
         "context_used": context_used,
