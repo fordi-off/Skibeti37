@@ -75,8 +75,8 @@ function formatInline(text) {
 // on whether any models were found in models/.
 function emptyStateHTML() {
   return allModels.length
-    ? `<div class="empty-state">Velg en modell over og skriv en melding for å starte.</div>`
-    : `<div class="empty-state">Ingen modeller installert.<br><button id="open-setup-btn" class="setup-primary" style="margin-top:14px;">Last ned modeller</button></div>`;
+    ? `<div class="empty-state"><span class="es-kicker">Skibeti37 — lokal modell-lab</span>Velg en modell og skriv en melding.<br>Skriv <code>/</code> for kommandoer.</div>`
+    : `<div class="empty-state"><span class="es-kicker">Skibeti37</span>Ingen modeller installert ennå.<br><button id="open-setup-btn" class="setup-primary" style="margin-top:18px;">Last ned modeller</button></div>`;
 }
 
 // ---------------- Confirm dialog ----------------

@@ -124,6 +124,15 @@ function clearEmptyState() {
   if (empty) empty.remove();
 }
 
+// Drop-cap the opening reply only, and only if it has enough text to carry one.
+function markLeadReply() {
+  const replies = chatEl.querySelectorAll(".msg.assistant");
+  replies.forEach((m, i) => {
+    const lead = i === 0 && (m.innerText || "").trim().length > 180;
+    m.classList.toggle("lead", lead);
+  });
+}
+
 // Rebuilds the whole chat view from `conversation`. Every rendered .msg node
 // carries data-ci = its index in `conversation`, so regenerate/edit know
 // exactly what to cut.
@@ -145,6 +154,7 @@ function renderConversation() {
   if (!hasContent) {
     chatEl.innerHTML = emptyStateHTML();
   }
+  markLeadReply();
 }
 
 function addUserMessage(text, ci, commands) {
@@ -212,16 +222,17 @@ function renderDocSources(msgEl, sources) {
   const details = document.createElement("details");
   details.className = "doc-sources";
   const summary = document.createElement("summary");
-  summary.textContent =
-    sources.length === 1 ? "1 dokumentutdrag brukt i svaret" : `${sources.length} dokumentutdrag brukt i svaret`;
+  summary.textContent = `Kilder · ${sources.length} utdrag`;
   details.appendChild(summary);
 
-  sources.forEach(src => {
+  sources.forEach((src, i) => {
     const item = document.createElement("div");
     item.className = "doc-source-item";
     const name = document.createElement("div");
     name.className = "doc-source-name";
-    name.textContent = src.score != null ? `${src.filename}  ·  likhet ${src.score}` : src.filename;
+    name.textContent = src.score != null
+      ? `[${i + 1}] ${src.filename} · ${src.score}`
+      : `[${i + 1}] ${src.filename}`;
     const snip = document.createElement("div");
     snip.className = "doc-source-snippet";
     snip.textContent = src.snippet || "";
@@ -617,6 +628,7 @@ async function onDone(info) {
 
   enhanceContent(s.contentEl);
   if (s.thinkingDetails) s.thinkingDetails.open = false;   // tuck the reasoning away
+  markLeadReply();
 
   exitGeneratingUI();
   await persistChat();
