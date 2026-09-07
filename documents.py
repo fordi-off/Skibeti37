@@ -27,8 +27,9 @@ TOP_K_CHUNKS = 5
 # language regardless.
 RAG_PREFIX = (
     "The following are the most relevant excerpts from the user's documents, retrieved "
-    "for this question. Use them to answer precisely, and reply in the language the user "
-    "is using. If the answer is not in the excerpts, say so instead of guessing:\n\n"
+    "for this question. Use them to answer precisely, and reply in the language of the "
+    "user's latest message even when the excerpts are in another language. If the answer "
+    "is not in the excerpts, say so instead of guessing:\n\n"
 )
 
 

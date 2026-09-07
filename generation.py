@@ -23,7 +23,7 @@ DEFAULT_MAX_TOKENS = 2000
 CONTINUATION_PROMPT = (
     "Continue your previous answer exactly where you left off. Do not repeat "
     "anything you have already written, and do not write any introduction - "
-    "continue straight on, in the same language."
+    "continue straight on, in the very same language as the rest of your answer."
 )
 
 # Set by stop() to break out of the streaming loop; cleared when a new

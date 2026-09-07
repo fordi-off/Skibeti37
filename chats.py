@@ -3,6 +3,7 @@ prompt, active skills, document context (RAG) and an optionally compressed
 conversation history into the messages actually sent to the model."""
 
 import os
+import re
 import time
 import uuid
 
@@ -18,8 +19,76 @@ RECENT_KEEP_MESSAGES = 10  # number of most recent messages always sent verbatim
 SUMMARY_PREFIX = (
     "Summary of earlier parts of this conversation (older messages are "
     "compressed to save space, but the user still has the full history "
-    "saved). Keep replying in the language the user is using:\n"
+    "saved). Keep replying in the language of the user's latest message:\n"
 )
+
+# Small, dependency-free language sniff. It only has to be confident about the
+# two languages this app actually sees a lot of; for anything else it returns
+# None and the model is simply told to match the user's language itself.
+_NO_WORDS = {
+    "og", "ikke", "ikkje", "jeg", "det", "er", "som", "på", "en", "et", "ein",
+    "ei", "å", "har", "kan", "vil", "hva", "kva", "hvorfor", "hvordan", "med",
+    "til", "de", "vi", "du", "meg", "deg", "være", "blir", "gjøre", "hvis",
+    "eller", "men", "så", "noen", "noe", "mye", "mer", "mest", "veldig", "bare",
+    "hele", "takk", "hei", "kanskje", "fordi", "denne", "dette", "disse", "slik",
+    "her", "der", "når", "skal", "må", "om", "av", "at", "den", "ja", "nei",
+    "mellom",
+}
+_EN_WORDS = {
+    "the", "and", "is", "are", "you", "what", "why", "how", "this", "that",
+    "of", "to", "in", "it", "for", "with", "can", "could", "would", "should",
+    "please", "thanks", "hey", "hello", "make", "want", "need", "because",
+    "there", "their", "about", "which", "when", "where", "does", "do",
+    "explain", "write", "tell", "give", "list", "show", "describe", "compare",
+    "summarize", "summarise", "into", "terms", "between", "difference",
+    "example", "simple", "help",
+}
+
+
+def detect_language(text):
+    """Return "Norwegian", "English", or None (not sure - let the model decide)."""
+    if not text:
+        return None
+    low = text.lower()
+    words = re.findall(r"[a-zà-ÿæøå]+", low)
+    if len(words) < 2:
+        return None
+    no_hits = sum(1 for w in words if w in _NO_WORDS)
+    en_hits = sum(1 for w in words if w in _EN_WORDS)
+    has_no_chars = any(c in low for c in "æøå")
+    if has_no_chars and en_hits == 0:
+        return "Norwegian"
+    if no_hits > en_hits and (no_hits >= 2 or has_no_chars):
+        return "Norwegian"
+    if en_hits > no_hits and en_hits >= 2:
+        return "English"
+    if has_no_chars and no_hits >= en_hits:
+        return "Norwegian"
+    return None
+
+
+def _language_directive(last_user_text, reasoning):
+    """A firm, final reminder appended to the system prompt. Small local models
+    drift and code-switch, so naming the target language explicitly - and
+    putting it last, where recency weights it most - keeps replies consistent."""
+    scope = (
+        "from the first word to the last, including the text inside <think>...</think>"
+        if reasoning else
+        "from the first word to the last"
+    )
+    lang = detect_language(last_user_text)
+    if lang:
+        return (
+            f"LANGUAGE: The user's latest message is written in {lang}. Write your "
+            f"entire reply in {lang} ({scope}). Do not switch or mix languages "
+            f"partway through, and do not translate the user's own words back to "
+            f"them. Keep code, direct quotes and proper names in their original form."
+        )
+    return (
+        f"LANGUAGE: Reply in the exact same language as the user's latest message "
+        f"({scope}). Do not switch or mix languages partway through. Keep code, "
+        f"direct quotes and proper names in their original form."
+    )
 
 
 def list_chats():
@@ -155,6 +224,13 @@ def build_context(chat_id, model_name, messages):
             compressed = True
     else:
         recent = history
+
+    # Keep the language reminder dead last - small models weight the end of the
+    # system prompt most heavily. "deepseek" marks the reasoning distills, which
+    # are the worst offenders for thinking in one language and answering in
+    # another.
+    reasoning = "deepseek" in (model_name or "").lower()
+    system_content += "\n\n" + _language_directive(last_user_msg, reasoning)
 
     final_messages = [{"role": "system", "content": system_content}] + recent
     return final_messages, {"compressed": compressed, "doc_sources": doc_sources}

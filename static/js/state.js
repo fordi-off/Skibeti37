@@ -9,8 +9,12 @@ let currentChatName = null;
 let isGenerating = false;
 
 const SYSTEM_PROMPT =
-  "You are a helpful assistant. Always reply in the same language the user " +
-  "writes in, and match their tone. Think step by step when a question needs it.";
+  "You are a helpful assistant. Reply in the same language as the user's most " +
+  "recent message, and keep the whole reply in that one language - never switch " +
+  "or mix languages partway through. If the user changes language, follow them " +
+  "from their next message on. Keep code, direct quotes and proper names in " +
+  "their original form. Match the user's tone, and think step by step when a " +
+  "question needs it.";
 
 let conversation = [{ role: "system", content: SYSTEM_PROMPT }];
 
