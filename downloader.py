@@ -52,6 +52,15 @@ CATALOG = [
         "url": f"{_HF}/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf",
     },
     {
+        "id": "main-8b", "role": "main", "size_label": "8B", "note": "sterkere enn 7B, ~7 GB RAM",
+        # Plain Qwen3 (not 3.5) - one generation newer/stronger than a 7B like
+        # Qwen2.5, still noticeably lighter than the 9B. It's hybrid like the
+        # 3.5 line, so _thinking_tag() sends it /no_think in this chat slot.
+        "filename": "Qwen_Qwen3-8B-Q4_K_M.gguf", "display_name": "Qwen3 8b",
+        "size_bytes": 5_027_783_040,
+        "url": f"{_HF}/bartowski/Qwen_Qwen3-8B-GGUF/resolve/main/Qwen_Qwen3-8B-Q4_K_M.gguf",
+    },
+    {
         "id": "main-9b", "role": "main", "size_label": "9B", "default": True, "note": "anbefalt, ~8 GB RAM",
         "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf", "display_name": "Qwen3.5 9b",
         "size_bytes": 6_169_341_984,
