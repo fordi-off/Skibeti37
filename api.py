@@ -46,14 +46,16 @@ class Api:
         models_cfg = config.get_models_config()
         return [
             {"filename": fname, "display_name": cfg["display_name"],
-             "active": cfg.get("active", True), "device": cfg.get("device", "cpu")}
+             "active": cfg.get("active", True), "device": cfg.get("device", "cpu"),
+             "kv_cache": cfg.get("kv_cache", "fp16")}
             for fname, cfg in sorted(models_cfg.items())
         ]
 
-    def update_model_settings(self, filename, display_name, active, device):
+    def update_model_settings(self, filename, display_name, active, device, kv_cache):
         cfg = config.load_config()
         models_cfg = cfg.setdefault("models", {})
-        models_cfg[filename] = {"display_name": display_name, "active": active, "device": device}
+        models_cfg[filename] = {"display_name": display_name, "active": active, "device": device,
+                                 "kv_cache": kv_cache}
         config.save_config(cfg)
         model_manager.unload_model(filename)
         return self.list_all_models_settings()

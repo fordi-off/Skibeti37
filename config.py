@@ -1,6 +1,6 @@
 """Settings and model discovery. config.json stores the display name,
-active status and CPU/GPU choice per model file, plus the context window
-and thread count."""
+active status, CPU/GPU choice and KV-cache mode per model file, plus the
+context window and thread count."""
 
 import json
 import os
@@ -76,7 +76,8 @@ def get_models_config():
     for f in files:
         entry = models_cfg.get(f)
         if entry is None:
-            entry = {"display_name": humanize_filename(f), "active": True, "device": "cpu"}
+            entry = {"display_name": humanize_filename(f), "active": True, "device": "cpu",
+                     "kv_cache": "fp16"}
             models_cfg[f] = entry
             changed = True
         else:
@@ -84,6 +85,7 @@ def get_models_config():
             entry.setdefault("display_name", humanize_filename(f))
             entry.setdefault("active", True)
             entry.setdefault("device", "cpu")
+            entry.setdefault("kv_cache", "fp16")
             if entry != before:
                 changed = True
         result[f] = entry

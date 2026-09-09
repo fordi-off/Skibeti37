@@ -77,15 +77,30 @@ async function refreshSettingsModelList() {
       deviceSelect.appendChild(o);
     });
 
+    const kvCacheSelect = document.createElement("select");
+    kvCacheSelect.title = "Hvor mye RAM modellens kontekst (KV-cache) bruker";
+    [
+      { value: "fp16", label: "Rask (mer RAM)" },
+      { value: "q8_0", label: "Spar RAM (tregere)" },
+    ].forEach(({ value, label }) => {
+      const o = document.createElement("option");
+      o.value = value;
+      o.textContent = label;
+      if (value === model.kv_cache) o.selected = true;
+      kvCacheSelect.appendChild(o);
+    });
+
     const save = async () => {
       await window.pywebview.api.update_model_settings(
-        model.filename, nameInput.value.trim() || model.filename, checkbox.checked, deviceSelect.value
+        model.filename, nameInput.value.trim() || model.filename, checkbox.checked,
+        deviceSelect.value, kvCacheSelect.value
       );
       await loadModels();
     };
 
     checkbox.onchange = save;
     deviceSelect.onchange = save;
+    kvCacheSelect.onchange = save;
     nameInput.onblur = save;
     nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") nameInput.blur(); });
 
@@ -115,6 +130,7 @@ async function refreshSettingsModelList() {
     row.appendChild(activeToggle);
     row.appendChild(nameWrap);
     row.appendChild(deviceSelect);
+    row.appendChild(kvCacheSelect);
     row.appendChild(delBtn);
     container.appendChild(row);
   });

@@ -388,6 +388,10 @@ each with:
   picker at all
 - An editable display name
 - A CPU/GPU dropdown per model (defaults to CPU)
+- A KV-cache dropdown per model — "Rask (mer RAM)" keeps the context
+  cache in fp16 (default: fastest, most RAM); "Spar RAM (tregere)"
+  quantises it to q8_0, roughly halving the RAM the context needs at the
+  cost of some speed. Useful for fitting a bigger model into limited RAM
 - **Slett** — deletes the `.gguf` (and any `.part`) from disk after a
   confirmation. Not available while that model is generating. The
   embedding model isn't listed here, so it can't be deleted by accident
@@ -413,7 +417,7 @@ and deletion live here.
 - **CPU threads slider** — set to roughly your CPU's physical core
   count. Also triggers a reload of all models when changed.
 - **Tilbakestill** — resets the context window, thread count and every
-  per-model setting (display name, active flag, CPU/GPU) to the code
+  per-model setting (display name, active flag, CPU/GPU, KV-cache mode) to the code
   defaults in `config.py`. Conversations, documents and skills are left
   alone. Equivalent to deleting `config.json`, which the app also
   regenerates from defaults on the next launch.
