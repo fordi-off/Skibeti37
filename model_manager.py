@@ -44,14 +44,16 @@ def _available_ram_bytes():
     return None
 
 
-def _kv_cache_reserve(weights_bytes, n_ctx):
-    """Rough RAM the KV cache will need, given q8_0 K/V quantisation. Scales
-    with context length and (via the file size) the model's depth/width.
-    Deliberately a slight over-estimate - better to warn early than swap."""
-    return (n_ctx / 4096) * (weights_bytes / 4e9) * 0.25e9
+def _kv_cache_reserve(weights_bytes, n_ctx, kv_cache="fp16"):
+    """Rough RAM the KV cache will need. Scales with context length and (via
+    the file size) the model's depth/width. Deliberately a slight
+    over-estimate - better to warn early than swap. q8_0 K/V quantisation
+    roughly halves this versus the fp16 default."""
+    base = (n_ctx / 4096) * (weights_bytes / 4e9) * 0.5e9
+    return base * 0.5 if kv_cache == "q8_0" else base
 
 
-def _check_ram(path):
+def _check_ram(path, kv_cache="fp16"):
     """Raise a clear error instead of letting llama.cpp hard-crash the whole
     process (or thrash the disk via mmap) when there isn't enough RAM for a
     model this size plus its KV cache."""
@@ -60,7 +62,7 @@ def _check_ram(path):
         return
     size = os.path.getsize(path)
     n_ctx = config.load_config().get("context_window", config.DEFAULT_CONTEXT)
-    needed = size * 1.06 + _kv_cache_reserve(size, n_ctx) + 700_000_000
+    needed = size * 1.06 + _kv_cache_reserve(size, n_ctx, kv_cache) + 700_000_000
     if avail < needed:
         raise MemoryError(
             f"Ikke nok ledig minne til å laste denne modellen. Den trenger omtrent "
@@ -70,7 +72,7 @@ def _check_ram(path):
         )
 
 
-def _new_llama(path, n_ctx, n_threads, n_gpu_layers):
+def _new_llama(path, n_ctx, n_threads, n_gpu_layers, kv_cache="fp16"):
     common = dict(
         model_path=path, n_ctx=n_ctx, n_threads=n_threads,
         n_gpu_layers=n_gpu_layers, verbose=False,
@@ -78,13 +80,15 @@ def _new_llama(path, n_ctx, n_threads, n_gpu_layers):
         # tokens, so the penalty can see - and break out of - paragraph loops.
         last_n_tokens_size=320,
     )
-    try:
-        # q8_0 K/V cache roughly halves the context memory with no meaningful
-        # quality loss; lets bigger models / longer contexts fit in RAM.
-        return Llama(**common, type_k=8, type_v=8)
-    except Exception:
-        applog.log("KV-cache quantization unavailable - using fp16 cache")
-        return Llama(**common)
+    if kv_cache == "q8_0":
+        try:
+            # q8_0 K/V cache roughly halves the context memory with no
+            # meaningful quality loss. llama.cpp only allows a quantised V
+            # cache when flash attention is on, so that has to come with it.
+            return Llama(**common, flash_attn=True, type_k=8, type_v=8)
+        except Exception:
+            applog.log("KV-cache quantization unavailable - using fp16 cache")
+    return Llama(**common)
 
 
 def get_model(filename):
@@ -92,17 +96,19 @@ def get_model(filename):
         path = os.path.join(config.MODELS_DIR, filename)
         if not os.path.exists(path):
             raise FileNotFoundError(f"Model file not found: {path}")
-        _check_ram(path)
-        cfg = config.load_config()
         model_cfg = config.get_models_config().get(filename, {})
+        kv_cache = model_cfg.get("kv_cache", "fp16")
+        _check_ram(path, kv_cache)
+        cfg = config.load_config()
         device = model_cfg.get("device", "cpu")
         n_gpu_layers = -1 if device == "gpu" else 0
         n_ctx = cfg.get("context_window", config.DEFAULT_CONTEXT)
         n_threads = cfg.get("n_threads", config.DEFAULT_THREADS)
         gb = os.path.getsize(path) / 1e9
-        applog.log(f"loading model: {filename} ({gb:.1f} GB, ctx {n_ctx}, {device}) ...")
+        applog.log(f"loading model: {filename} ({gb:.1f} GB, ctx {n_ctx}, "
+                   f"{device}, kv={kv_cache}) ...")
         t0 = time.time()
-        loaded_models[filename] = _new_llama(path, n_ctx, n_threads, n_gpu_layers)
+        loaded_models[filename] = _new_llama(path, n_ctx, n_threads, n_gpu_layers, kv_cache)
         applog.log(f"model ready: {filename} in {time.time() - t0:.1f}s "
                    f"(resident: {len(loaded_models)})")
     return loaded_models[filename]
