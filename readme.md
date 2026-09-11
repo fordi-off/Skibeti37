@@ -68,7 +68,9 @@ your-folder/
 └───static/
     │   index.html              ← page structure only
     │   marked.min.js            ← markdown rendering, loaded locally (offline)
+    │   highlight.min.js         ← code-block syntax highlighting, loaded locally
     │
+    ├───katex/                    ← math rendering (KaTeX + auto-render), loaded locally
     ├───css/
     │       styles.css
     │
@@ -360,7 +362,11 @@ Replies are rendered as markdown via `marked.js` (runs entirely
 locally): code blocks, bold/italic, tables, lists, headings. A small
 repair step also fixes tables where the model generates a malformed
 separator row, which would otherwise make the whole table render as
-plain text.
+plain text. Math is rendered via `KaTeX` (also fully local, no network
+call) - `\( \)`/`\[ \]`/`$$ $$` delimiters are converted to formulas
+once a reply finishes streaming; the system prompt asks the model to
+use those delimiters and avoid a bare single `$`, which would be
+ambiguous with currency.
 
 ### Copy buttons
 
