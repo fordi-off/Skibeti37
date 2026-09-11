@@ -214,10 +214,9 @@ def build_context(chat_id, model_name, messages):
             utility_filename = config.get_utility_model_filename()
             small = model_manager.get_model(utility_filename)
             prompt = _summary_prompt(cache.get("summary", ""), new_chunk)
-            if "qwen3" in (utility_filename or "").lower():
-                prompt[-1]["content"] += " /no_think"
-            resp = small.create_chat_completion(messages=prompt, max_tokens=500, temperature=0.3)
-            new_summary = resp["choices"][0]["message"]["content"].strip()
+            new_summary = model_manager.complete_no_think(
+                small, utility_filename or "", prompt, 500, temperature=0.3
+            )
             chat_store.save_summary_cache(chat_id, new_summary, keep_from)
             cache = {"summary": new_summary, "summarized_count": keep_from}
 

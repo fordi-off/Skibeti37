@@ -95,20 +95,27 @@ def _is_reasoning_model(model_name):
     return "deepseek" in low or "-r1-" in low or "thinking" in low
 
 
-def _thinking_tag(model_name):
-    """Plain Qwen3 models are hybrid - think or answer directly. Steer them
-    explicitly: /no_think in the chat slot, /think in the reasoning slot. The
-    single-mode 2507 variants, the DeepSeek distill and non-Qwen3 models all
-    just ignore the token."""
-    if "qwen3" not in model_name.lower():
-        return None
-    return "/think" if _is_reasoning_model(model_name) else "/no_think"
+def _wants_no_think(model_name):
+    """Plain Qwen3 models are hybrid - think or answer directly - and belong
+    in the chat slot with thinking off. The single-mode 2507 variants, the
+    DeepSeek distill and non-Qwen3 models are excluded: they either can't
+    think at all or are reasoning models that should."""
+    return "qwen3" in model_name.lower() and not _is_reasoning_model(model_name)
 
 
 def _apply_thinking_tag(final_messages, model_name):
-    tag = _thinking_tag(model_name)
-    if not tag:
+    """Force the reasoning slot's hybrid Qwen3 models into thinking mode via
+    the standard /think tag. The chat slot's opposite case (/no_think) isn't
+    applied here - llama.cpp currently ignores Qwen3.5's enable_thinking=false
+    (ggml-org/llama.cpp #20182, #20409), so the model thinks anyway and, since
+    it isn't primed to wrap that in <think>, the raw chain-of-thought leaks
+    straight into the visible reply instead of being caught by the UI's
+    <think>-block safety net. _stream_and_report primes an empty, already-
+    closed <think></think> in the raw prompt instead, which sidesteps the
+    template bug entirely rather than depending on the broken flag."""
+    if "qwen3" not in model_name.lower() or not _is_reasoning_model(model_name):
         return
+    tag = "/think"
     for m in reversed(final_messages):
         if m["role"] == "user":
             if not m["content"].rstrip().endswith(tag):
@@ -157,9 +164,19 @@ def _stream_and_report(llm, final_messages, meta, model_name):
     n_tokens = 0
 
     if not stopped:
-        stream = llm.create_chat_completion(
-            messages=final_messages, max_tokens=max_tokens, stream=True, **SAMPLING_PARAMS
-        )
+        if _wants_no_think(model_name):
+            # Bypass create_chat_completion's template entirely for this case -
+            # see _apply_thinking_tag for why the soft /no_think signal can't
+            # be trusted to actually turn thinking off.
+            prompt = model_manager.render_forced_no_think_prompt(final_messages)
+            stream = llm.create_completion(
+                prompt=prompt, max_tokens=max_tokens, stream=True,
+                stop=["<|im_end|>", "<|im_start|>"], **SAMPLING_PARAMS
+            )
+        else:
+            stream = llm.create_chat_completion(
+                messages=final_messages, max_tokens=max_tokens, stream=True, **SAMPLING_PARAMS
+            )
         answer = ""
         checked_at = 0
         for chunk in stream:
@@ -167,7 +184,7 @@ def _stream_and_report(llm, final_messages, meta, model_name):
                 stopped = True
                 break
             choice = chunk["choices"][0]
-            delta = choice["delta"].get("content", "")
+            delta = choice["delta"].get("content", "") if "delta" in choice else choice.get("text", "")
             if delta:
                 n_tokens += 1
                 answer += delta

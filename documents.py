@@ -181,23 +181,20 @@ def add_document(chat_id):
     if not utility_filename:
         return {"cancelled": True, "error": "Ingen modeller funnet i models/-mappen"}
     small = model_manager.get_model(utility_filename)
-    nothink = " /no_think" if "qwen3" in utility_filename.lower() else ""
     partial_summaries = []
 
     applog.log(f"  summarizing in {len(summary_chunks)} part(s) with {utility_filename} ...")
     for i, chunk in enumerate(summary_chunks):
         status(f"Oppsummerer {filename}: del {i + 1}/{len(summary_chunks)}")
         prompt = _summarize_chunk_prompt(chunk)
-        prompt[-1]["content"] += nothink
-        resp = small.create_chat_completion(messages=prompt, max_tokens=350, temperature=0.3)
-        partial_summaries.append(resp["choices"][0]["message"]["content"].strip())
+        partial_summaries.append(
+            model_manager.complete_no_think(small, utility_filename, prompt, 350, temperature=0.3)
+        )
 
     status(f"Setter sammen sluttsammendrag for {filename}...")
     if len(partial_summaries) > 1:
         prompt = _combine_summaries_prompt(partial_summaries)
-        prompt[-1]["content"] += nothink
-        resp = small.create_chat_completion(messages=prompt, max_tokens=1200, temperature=0.3)
-        final_summary = resp["choices"][0]["message"]["content"].strip()
+        final_summary = model_manager.complete_no_think(small, utility_filename, prompt, 1200, temperature=0.3)
     else:
         final_summary = partial_summaries[0] if partial_summaries else "(tomt dokument)"
 

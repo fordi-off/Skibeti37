@@ -186,3 +186,31 @@ def get_embedder():
 def reset_embedder():
     global embedder
     embedder = None
+
+
+def render_forced_no_think_prompt(messages):
+    """Render the ChatML prompt llama.cpp's own template would produce, but
+    with the assistant turn already primed with a closed, empty <think></think>
+    block, so a hybrid Qwen3 model has no opening to think in. Needed because
+    llama.cpp currently ignores Qwen3.5's enable_thinking=false (ggml-org/
+    llama.cpp #20182, #20409) - relying on that flag, or the /no_think text
+    hint some templates read, leaves the model thinking anyway, often without
+    even wrapping it in <think>, leaking raw chain-of-thought into the reply."""
+    rendered = "".join(f"<|im_start|>{m['role']}\n{m['content']}<|im_end|>\n" for m in messages)
+    return rendered + "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+
+
+def complete_no_think(llm, model_filename, messages, max_tokens, **sampling_kwargs):
+    """Non-streaming chat completion, forcing a hybrid Qwen3 model out of
+    thinking mode (see render_forced_no_think_prompt) so background tasks
+    like summarization never get a leaked chain-of-thought as their result.
+    Anything else just goes through create_chat_completion as normal."""
+    if "qwen3" in model_filename.lower():
+        prompt = render_forced_no_think_prompt(messages)
+        resp = llm.create_completion(
+            prompt=prompt, max_tokens=max_tokens,
+            stop=["<|im_end|>", "<|im_start|>"], **sampling_kwargs
+        )
+        return resp["choices"][0]["text"].strip()
+    resp = llm.create_chat_completion(messages=messages, max_tokens=max_tokens, **sampling_kwargs)
+    return resp["choices"][0]["message"]["content"].strip()
