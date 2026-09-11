@@ -23,8 +23,11 @@ CHUNK = 256 * 1024
 #   main + reasoning -> user picks a size, or skips
 #
 # Main + utility are Qwen3.5 (2026). The plain Qwen3/3.5 models are "hybrid" -
-# they can think or answer directly; generation.py sends /no_think for the chat
-# slot. The reasoning slot uses single-mode models (Qwen3-*-Thinking, the
+# they can think or answer directly; generation.py/model_manager.py force
+# thinking off for the chat slot (see complete_no_think there - llama.cpp
+# currently ignores these models' own enable_thinking=false, so the app
+# primes an already-closed <think></think> in the raw prompt instead). The
+# reasoning slot uses single-mode models (Qwen3-*-Thinking, the
 # DeepSeek-R1 distill) whose names encode "thinking"/"deepseek" so the app can
 # tell them apart. Older Qwen2.5 / DeepSeek .gguf files keep working.
 _HF = "https://huggingface.co"
@@ -55,7 +58,8 @@ CATALOG = [
         "id": "main-8b", "role": "main", "size_label": "8B", "note": "sterkere enn 7B, ~7 GB RAM",
         # Plain Qwen3 (not 3.5) - one generation newer/stronger than a 7B like
         # Qwen2.5, still noticeably lighter than the 9B. It's hybrid like the
-        # 3.5 line, so _thinking_tag() sends it /no_think in this chat slot.
+        # 3.5 line, so generation.py forces thinking off for it in this slot
+        # (see _wants_no_think there).
         "filename": "Qwen_Qwen3-8B-Q4_K_M.gguf", "display_name": "Qwen3 8b",
         "size_bytes": 5_027_783_040,
         "url": f"{_HF}/bartowski/Qwen_Qwen3-8B-GGUF/resolve/main/Qwen_Qwen3-8B-Q4_K_M.gguf",

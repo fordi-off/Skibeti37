@@ -138,12 +138,17 @@ panel:
   into the app; add your own `.gguf` files to `models/` whenever.
 
 The plain Qwen3.5 models are "hybrid" — they can reason step by step or
-answer directly. The app sends `/no_think` for the chat slot so replies
-are fast; the reasoning slot uses dedicated `-Thinking` / DeepSeek-R1
-models. Older Qwen2.5 / DeepSeek `.gguf` files you already have keep
-working. Bigger options exist (Qwen3.5-27B, the 35B-A3B MoE) but need
-16–24 GB RAM — add those `.gguf` files by hand if your machine has the
-headroom.
+answer directly. For the chat slot the app forces thinking off by priming
+an already-closed `<think></think>` in the raw prompt, rather than relying
+on the model's own `enable_thinking=false`/`/no_think` switch — llama.cpp
+currently ignores that for Qwen3.5 ([ggml-org/llama.cpp#20182](https://github.com/ggml-org/llama.cpp/issues/20182),
+[#20409](https://github.com/ggml-org/llama.cpp/issues/20409)), which used to
+show up as the model rambling through a visible, unstructured "thinking"
+ramble instead of a clean answer. The reasoning slot uses dedicated
+`-Thinking` / DeepSeek-R1 models. Older Qwen2.5 / DeepSeek `.gguf` files you
+already have keep working. Bigger options exist (Qwen3.5-27B, the 35B-A3B
+MoE) but need 16–24 GB RAM — add those `.gguf` files by hand if your machine
+has the headroom.
 
 Downloads run one at a time with a live progress bar, speed and ETA, and
 resume from where they stopped (`.part` file) if interrupted. The panel is
