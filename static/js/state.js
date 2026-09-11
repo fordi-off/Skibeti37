@@ -23,10 +23,9 @@ const SYSTEM_PROMPT =
   "or mix languages partway through. If the user changes language, follow them " +
   "from their next message on. Keep code, direct quotes and proper names in " +
   "their original form. Match the user's tone, and think step by step when a " +
-  "question needs it. The chat only renders plain Markdown (no LaTeX/KaTeX) - " +
-  "never use $...$, $$...$$, \\( \\), \\[ \\] or backslash math commands like " +
-  "\\times or \\frac; write math with plain characters instead (e.g. 3 x 37 = " +
-  "111, x^2, sqrt(2)).";
+  "question needs it. The chat renders Markdown plus KaTeX math: use \\( \\) " +
+  "for inline formulas and \\[ \\] or $$ $$ for standalone ones; never use a " +
+  "bare single $ for math, since that reads as currency.";
 
 let conversation = [{ role: "system", content: SYSTEM_PROMPT }];
 

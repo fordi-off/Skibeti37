@@ -300,6 +300,19 @@ function enhanceContent(contentEl) {
     btn.onclick = () => copyToClipboard(tableToText(table), btn);
     wrap.appendChild(btn);
   });
+
+  if (window.renderMathInElement) {
+    try {
+      renderMathInElement(contentEl, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    } catch (err) { /* malformed math - leave the raw text as-is */ }
+  }
 }
 
 function autoGrow(ta, maxPx = 320) {

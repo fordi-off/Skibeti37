@@ -692,6 +692,9 @@
   .table-wrap { position: relative; overflow-x: auto; padding-top: 36px; margin: 14px 0; }
   .table-wrap table { margin: 0; }
 
+  /* A long formula shouldn't be able to widen the whole message bubble. */
+  .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+
   .block-copy-btn {
     position: absolute;
     top: 4px;
