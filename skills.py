@@ -116,6 +116,22 @@ Use this to proofread or improve a piece of Norwegian text.
 - Output: first the corrected text, then a short bullet list of the substantive changes (skip trivial typo fixes).
 
 If the text is already clean, say so instead of inventing changes.
+
+## /bokmal  Translate the given text to bokmål
+Translate the text that follows into Norwegian bokmål.
+
+- If it's already bokmål, lightly clean it up instead of leaving it unchanged.
+- This is a translation, not a rewrite: keep the meaning, tone and structure (paragraphs, lists) intact.
+- Keep proper names, direct quotes and technical terms with no good Norwegian equivalent as they are.
+- Output only the translated text - no preamble, no explanation.
+
+## /nynorsk  Translate the given text to nynorsk
+Translate the text that follows into Norwegian nynorsk.
+
+- If it's already nynorsk, lightly clean it up instead of leaving it unchanged.
+- This is a translation, not a rewrite: keep the meaning, tone and structure (paragraphs, lists) intact.
+- Keep proper names, direct quotes and technical terms with no good Norwegian equivalent as they are.
+- Output only the translated text - no preamble, no explanation.
 """
 
 

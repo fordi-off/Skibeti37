@@ -370,8 +370,8 @@ edit one) and the panel and autocomplete pick it up within a few
 seconds — no restart. The ↻ button forces an immediate refresh.
 
 Three skill files are bundled: **writing.md** (`/humanize`, `/shorten`,
-`/simple`), **language.md** (`/norwegian`, `/proofread`), **tutor.md**
-(`/tutor`).
+`/simple`), **language.md** (`/norwegian`, `/proofread`, `/bokmal`,
+`/nynorsk`), **tutor.md** (`/tutor`).
 
 ### Formatting
 
