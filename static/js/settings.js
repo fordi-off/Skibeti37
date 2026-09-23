@@ -5,6 +5,7 @@ const settingsOverlayEl = document.getElementById("settings-overlay");
 document.getElementById("settings-btn").onclick = () => {
   settingsOverlayEl.classList.remove("hidden");
   refreshSettingsModelList();
+  renderDownloadArea();
   refreshSettingsDocList();
   refreshSettingsSkillList(true);
   refreshSettingsPerformance();
@@ -25,12 +26,17 @@ document.querySelectorAll(".settings-tab").forEach(tab => {
   };
 });
 
-// --- Models tab ---
+// Opens Settings straight to the Modeller tab - used by the empty-state
+// "Last ned modeller" button when no models are installed at all.
+function openModelDownloads() {
+  settingsOverlayEl.classList.remove("hidden");
+  document.querySelectorAll(".settings-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "models"));
+  document.querySelectorAll(".settings-pane").forEach(p => p.classList.toggle("active", p.id === "pane-models"));
+  refreshSettingsModelList();
+  renderDownloadArea();
+}
 
-document.getElementById("settings-download-btn").onclick = () => {
-  settingsOverlayEl.classList.add("hidden");
-  renderSetupPanel();
-};
+// --- Models tab ---
 
 async function refreshSettingsModelList() {
   const models = await window.pywebview.api.list_all_models_settings();

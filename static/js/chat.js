@@ -357,12 +357,11 @@ async function runGeneration() {
   enterGeneratingUI(`genererer med ${modelLabels[currentModel] || currentModel}...`);
 
   const { contentEl, metaTextEl } = addAssistantMessage(currentModel, conversation.length);
-  const isReasoning = isReasoningModel(currentModel);
 
   window._streamState = {
-    contentEl, isReasoning, metaTextEl,
+    contentEl, metaTextEl,
     metaBase: metaTextEl ? metaTextEl.textContent : "",
-    rawBuffer: "", answerBuffer: "", thinkingEl: null, inThinking: false,
+    answerBuffer: "",
     tokenCount: 0, startTime: performance.now(), isContinuation: false,
   };
 
@@ -538,52 +537,8 @@ function renderAnswer(s, text) {
 
 function onChunk(delta) {
   const s = window._streamState;
-  s.rawBuffer += delta;
   s.tokenCount += 1;
-
-  // Safety net: a model we didn't flag as reasoning still opened a <think>
-  // block (e.g. a hybrid Qwen that ignored /no_think). Render it properly.
-  if (!s.isReasoning && s.rawBuffer.trimStart().startsWith("<think>")) {
-    s.isReasoning = true;
-  }
-
-  if (s.isReasoning) {
-    // Open the thinking block up front: Qwen3-Thinking often omits the opening
-    // <think> tag and emits only the closing one, so we can't wait to see it.
-    if (!s.thinkingEl) {
-      const details = document.createElement("details");
-      details.className = "thinking-block";
-      details.open = true;   // visible while it streams, collapsed on done
-      const summary = document.createElement("summary");
-      summary.textContent = "Tankegang";
-      s.thinkingEl = document.createElement("div");
-      s.thinkingEl.className = "thinking-body";
-      details.appendChild(summary);
-      details.appendChild(s.thinkingEl);
-      s.thinkingDetails = details;
-      s.contentEl.appendChild(details);
-    }
-    // Rebuild both panes from the raw buffer each chunk - the split point is
-    // wherever </think> lands (there may be no opening tag at all).
-    const raw = s.rawBuffer.replace(/^\s*<think>/, "");
-    const end = raw.indexOf("</think>");
-    if (end === -1) {
-      s.thinkingEl.textContent = raw;
-    } else {
-      s.thinkingEl.textContent = raw.slice(0, end);
-      s.answerBuffer = raw.slice(end + 8).replace(/^\s+/, "");
-      let answerEl = s.contentEl.querySelector(".answer-text");
-      if (!answerEl) {
-        answerEl = document.createElement("div");
-        answerEl.className = "answer-text";
-        s.contentEl.appendChild(answerEl);
-      }
-      answerEl.innerHTML = formatInline(s.answerBuffer);
-    }
-  } else {
-    renderAnswer(s, delta);
-  }
-
+  renderAnswer(s, delta);
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
@@ -619,22 +574,6 @@ async function onDone(info) {
     s.answerBuffer = trimRepeatedTail(s.answerBuffer);
     const answerEl = s.contentEl.querySelector(".answer-text");
     if (answerEl) answerEl.innerHTML = formatInline(s.answerBuffer);
-  }
-
-  // Reasoning model that never closed its <think> - treat the whole thing as
-  // the answer rather than hiding it all in a collapsed block.
-  if (s.isReasoning && !stopped && s.answerBuffer.trim() === ""
-      && s.thinkingEl && s.thinkingEl.textContent.trim() !== "") {
-    s.answerBuffer = s.thinkingEl.textContent.trim();
-    if (s.thinkingDetails) s.thinkingDetails.remove();
-    s.thinkingDetails = null;
-    let answerEl = s.contentEl.querySelector(".answer-text");
-    if (!answerEl) {
-      answerEl = document.createElement("div");
-      answerEl.className = "answer-text";
-      s.contentEl.appendChild(answerEl);
-    }
-    answerEl.innerHTML = formatInline(s.answerBuffer);
   }
 
   if (s.isContinuation) {
@@ -683,7 +622,6 @@ async function onDone(info) {
   }
 
   enhanceContent(s.contentEl);
-  if (s.thinkingDetails) s.thinkingDetails.open = false;   // tuck the reasoning away
   markLeadReply();
 
   exitGeneratingUI();

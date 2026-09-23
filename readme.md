@@ -53,7 +53,7 @@ your-folder/
 │   documents.py              ← document library and RAG search
 │   generation.py             ← streaming chat completion
 │   model_manager.py          ← loading/unloading GGUF models
-│   downloader.py             ← model catalog + first-run download queue
+│   downloader.py             ← model catalog + download queue
 │   runtime.py                ← shared window reference
 │   skills.py                  ← file-based skills / slash commands
 │   requirements.txt
@@ -81,7 +81,7 @@ your-folder/
             documents.js             ← document panel + add-document dialog
             skills.js                ← /command reference panel + input autocomplete
             settings.js               ← settings modal (all tabs)
-            setup.js                  ← first-run / model-download screen
+            setup.js                  ← model downloads (Settings -> Modeller)
             main.js                   ← startup
 ```
 
@@ -121,47 +121,48 @@ pip install pywebview numpy
 
 ## Models
 
-**You don't download models by hand.** The first time the app starts
-without the base models, the chat area shows a small **"Kom i gang"**
-panel:
+**You don't download models by hand.** Open **Settings → Modeller** -
+the same tab where you manage the models you already have - and a
+checklist of downloadable sizes sits above your installed models:
 
-- **nomic-embed-text v1.5** (document search) and **Qwen3.5 2B**
-  (the background model for summaries/compression) download
-  automatically — no choice.
-- **Hovedmodell** — pick a size for the normal chat model from a list of
-  cards, each with a short description: Qwen3.5 **4B** (~4.5 GB RAM),
-  **Qwen3 8B** or **NB Llama 3.1 8B** (~7 GB RAM each), **9B** (default;
-  full Q4 ~8 GB RAM, or compact Q3 ~7 GB), or "Ingen". The 9B is the
-  sweet spot — noticeably stronger than an 8B, still runs where a 14B
-  won't; the 8B options are a middle ground when even the compact 9B
-  doesn't fit. NB Llama 3.1 8B is a National Library of Norway fine-tune
-  (the NoTraM project) aimed specifically at Norwegian Bokmål/Nynorsk -
-  worth trying since this app's replies are almost always in Norwegian.
-- **Hopp over** downloads only the two automatic files and drops you
-  into the app; add your own `.gguf` files to `models/` whenever.
+- **nomic-embed-text v1.5** (document search) and **Qwen3.5 2B** (the
+  background model for summaries/compression) aren't in the checklist -
+  they download automatically, alongside anything you do pick, if they
+  aren't already on disk.
+- Tick any number of **main chat models** and click "Last ned valgte":
+  Qwen3.5 **4B** (~4.5 GB RAM), **Qwen3 8B** or **NB Llama 3.1 8B**
+  (~7 GB RAM each), **9B** (full Q4 ~8 GB RAM, or compact Q3 ~7 GB).
+  The 9B is the sweet spot — noticeably stronger than an 8B, still runs
+  where a 14B won't; the 8B options are a middle ground when even the
+  compact 9B doesn't fit. NB Llama 3.1 8B is a National Library of
+  Norway fine-tune (the NoTraM project) aimed specifically at Norwegian
+  Bokmål/Nynorsk - worth trying since this app's replies are almost
+  always in Norwegian.
+- Downloading nothing and closing Settings is fine too — just add your
+  own `.gguf` files to `models/` whenever.
 
-There's no dedicated reasoning/"thinking" model in the guided installer -
-the DeepSeek-R1 and Qwen3-Thinking options were dropped for being buggier
-than they're worth for most use. The plain Qwen3.5 models are still
-"hybrid" — they can reason step by step or answer directly. For the chat
-slot the app forces thinking off by priming an already-closed
-`<think></think>` in the raw prompt, rather than relying on the model's own
+The plain Qwen3.5/Qwen3 models are "hybrid" — they can reason step by
+step or answer directly. This app always forces thinking off for them
+in the chat slot, by priming an already-closed `<think></think>` in the
+raw prompt rather than relying on the model's own
 `enable_thinking=false`/`/no_think` switch — llama.cpp currently ignores
 that for Qwen3.5 ([ggml-org/llama.cpp#20182](https://github.com/ggml-org/llama.cpp/issues/20182),
 [#20409](https://github.com/ggml-org/llama.cpp/issues/20409)), which used to
 show up as the model rambling through a visible, unstructured "thinking"
-ramble instead of a clean answer. If you want a dedicated reasoning model
-anyway, drop a `-Thinking` / DeepSeek-R1 `.gguf` into `models/` yourself -
-the app still recognizes and handles one by filename (see "Reasoning
-models" below). Older Qwen2.5 / DeepSeek `.gguf` files you already have
-keep working. Bigger options exist (Qwen3.5-27B, the 35B-A3B MoE) but need
-16–24 GB RAM — add those `.gguf` files by hand if your machine has the
-headroom.
+ramble instead of a clean answer. There's no reasoning-model support at
+all beyond that: dropping a dedicated `-Thinking` / DeepSeek-R1 `.gguf`
+into `models/` still loads and runs it, but any `<think>` block it emits
+just shows up as plain text in the reply - the app doesn't recognize or
+collapse it, so it isn't recommended. Older Qwen2.5 `.gguf` files work
+fine as plain chat models. Bigger options exist (Qwen3.5-27B, the
+35B-A3B MoE) but need 16–24 GB RAM — add those `.gguf` files by hand if
+your machine has the headroom.
 
 Downloads run one at a time with a live progress bar, speed and ETA, and
-resume from where they stopped (`.part` file) if interrupted. The panel is
-also reachable later from **Settings → Modeller → "+ Last ned modeller"**.
-The catalog (URLs, sizes, quants) lives in `downloader.py`.
+resume from where they stopped (`.part` file) if interrupted, and keep
+running even if you close the Settings modal - reopen it and the
+checklist resyncs to whatever's still in progress. The catalog (URLs,
+sizes, quants) lives in `downloader.py`.
 
 Everything lands as a single-file GGUF in `models/` and is still
 **discovered automatically** — anything you drop in yourself shows up too.
@@ -266,17 +267,6 @@ The first message to a model that isn't in RAM yet shows
 (seconds to a minute on a slow machine), then switches to `genererer
 med <model>...`. Switching models mid-conversation shows the same while
 it recomputes the context estimate.
-
-### Reasoning models
-
-Not offered by the guided installer (see "Models" above), but still
-supported if you add one to `models/` yourself: a reasoning model
-(Qwen3-Thinking, DeepSeek-R1) wraps its chain-of-thought in
-`<think>...</think>`. That part is shown live in a collapsible
-**Tankegang** block that folds away once the answer is done — click it
-to read the reasoning. Only the answer is saved to the conversation.
-The block also opens if a hybrid Qwen model emits `<think>` even though
-it isn't a dedicated reasoning model.
 
 ### Speed display
 
@@ -402,8 +392,10 @@ same message seamlessly, with no repeated content and no new bubble.
 Click the gear icon (top right) to open it. Four tabs:
 
 ### Modeller
-Every `.gguf` file found in `models/` (except the embedding model),
-each with:
+A checklist of downloadable model sizes (see "Models" above) sits at the
+top - tick any number and click "Last ned valgte" to fetch them, right
+here without leaving Settings. Below it, every `.gguf` file already in
+`models/` (except the embedding model) is listed, each with:
 - An active/inactive toggle — inactive models don't appear in the main
   picker at all
 - An editable display name
@@ -550,13 +542,6 @@ RAM against the file size (Windows only). If there clearly isn't enough
 it stops with a message telling you how much is needed, instead of
 letting `llama.cpp` hard-crash the whole app. Close other programs, pick
 a smaller model, or lower the context window.
-
-**DeepSeek-R1 and Norwegian are a weak combination.** Its `<think>`
-reasoning leans heavily on English. For Norwegian maths/logic the
-Qwen3-Thinking model holds the language better; keep DeepSeek for
-English reasoning tasks. The firm `LANGUAGE:` line added to every
-prompt (see `chats.py`) mostly holds either model to the user's
-language now, but the effect is still weaker inside `<think>`.
 
 **Repetition penalty and language slips.** An overly aggressive
 `frequency_penalty` was found to push Qwen models into code-switching

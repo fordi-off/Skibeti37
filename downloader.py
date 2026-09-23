@@ -24,14 +24,14 @@ CHUNK = 256 * 1024
 #
 # Main + utility are Qwen3.5 (2026). The plain Qwen3/3.5 models are "hybrid" -
 # they can think or answer directly; generation.py/model_manager.py force
-# thinking off for the chat slot (see complete_no_think there - llama.cpp
-# currently ignores these models' own enable_thinking=false, so the app
-# primes an already-closed <think></think> in the raw prompt instead). A
-# dedicated single-mode thinking model (Qwen3-*-Thinking, a DeepSeek-R1
-# distill) still works if added to models/ by hand - generation.py/chat.js
-# recognize one by "thinking"/"deepseek"/"-r1-" in the filename - it's just
-# not offered by the guided installer for now. Older Qwen2.5 / DeepSeek
-# .gguf files keep working too.
+# thinking off unconditionally for any model with "qwen3" in its filename
+# (see complete_no_think there - llama.cpp currently ignores these models'
+# own enable_thinking=false, so the app primes an already-closed
+# <think></think> in the raw prompt instead). There's no reasoning-model
+# support anymore: a dedicated thinking/DeepSeek-R1 .gguf added to models/ by
+# hand still loads and runs, but any <think> block it emits just shows up as
+# plain text - the app doesn't recognize or collapse it. Older Qwen2.5
+# .gguf files keep working as plain chat models.
 _HF = "https://huggingface.co"
 CATALOG = [
     {
@@ -115,12 +115,6 @@ def is_installed(entry):
 
 def catalog_with_status():
     return [{**e, "installed": is_installed(e)} for e in CATALOG]
-
-
-def needs_setup():
-    """True while the two always-required files aren't both on disk. That is
-    the only thing that forces the setup panel; everything else is optional."""
-    return not all(is_installed(_by_id[i]) for i in AUTO_IDS)
 
 
 def state():

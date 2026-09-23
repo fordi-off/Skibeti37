@@ -22,11 +22,5 @@ async function startupLoad() {
 
 window.addEventListener("pywebviewready", async () => {
   logStatus("bridge ready");
-  const { needs_setup } = await window.pywebview.api.setup_status();
-  if (needs_setup) {
-    logStatus("base models missing - showing setup");
-    renderSetupPanel();          // shows in the chat area until the base models are downloaded
-  } else {
-    await startupLoad();
-  }
+  await startupLoad();   // no models yet -> loadModels() shows the empty state with a download link
 });

@@ -71,7 +71,6 @@
   .section-head h2,
   .cmd-group-head,
   .settings-tab,
-  .setup-panel label,
   #settings-btn,
   .msg.user::before,
   .msg-meta .meta-text,
@@ -500,33 +499,6 @@
     color: var(--ink-faint);
   }
   .msg-meta .meta-text::before { content: "\2022 "; color: var(--trace); }
-
-  .thinking-block {
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--amber);
-    background: var(--amber-soft);
-    margin: 14px 0;
-    border-radius: 2px;
-    color: #6A4A18;
-  }
-  .thinking-block > summary {
-    cursor: pointer;
-    padding: 8px 14px;
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    user-select: none;
-    list-style-position: inside;
-  }
-  .thinking-block[open] > summary { border-bottom: 1px solid rgba(178, 107, 18, 0.28); }
-  .thinking-block > .thinking-body {
-    padding: 12px 14px;
-    font-family: var(--mono);
-    font-size: 12px;
-    line-height: 1.65;
-    white-space: pre-wrap;
-  }
 
   .content pre {
     background: var(--panel);
@@ -1138,29 +1110,8 @@
   }
   .confirm-danger-btn:hover { filter: brightness(1.1); }
 
-  /* ---------- First-run model setup (inline in #chat) ---------- */
+  /* ---------- Model downloads (Settings -> Modeller) ---------- */
 
-  .setup-panel {
-    max-width: 540px;
-    margin: 28px auto;
-    font-size: 14px;
-    background: var(--panel);
-    border: 1px solid var(--line-strong);
-    border-radius: 2px;
-    padding: 26px 28px;
-  }
-  .setup-panel h2 { font-family: var(--sans); font-size: 22px; font-weight: 700; margin: 0 0 12px; }
-  .setup-panel h2::before { content: "+ "; color: var(--accent); font-weight: 400; }
-  .setup-panel p { color: var(--ink-soft); line-height: 1.7; margin: 0 0 22px; font-size: 14px; }
-  .setup-panel code { font-family: var(--mono); font-size: 12px; background: var(--accent-soft); padding: 0 4px; }
-
-  .setup-panel label {
-    display: block;
-    font-size: 10px;
-    letter-spacing: 0.13em;
-    color: var(--ink-faint);
-    margin-bottom: 16px;
-  }
   .model-choice-list { display: flex; flex-direction: column; gap: 8px; margin: 7px 0 4px; }
   .model-choice-item {
     display: flex;
@@ -1175,7 +1126,7 @@
   .model-choice-item:hover { border-color: var(--accent); }
   .model-choice-item.selected { border-color: var(--accent); background: var(--accent-soft); }
   .model-choice-item.disabled { opacity: 0.55; cursor: default; }
-  .model-choice-item input[type="radio"] { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; }
+  .model-choice-item input { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; }
   .model-choice-body { flex: 1; min-width: 0; }
   .model-choice-title {
     font-family: var(--sans);

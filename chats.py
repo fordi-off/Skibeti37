@@ -68,27 +68,24 @@ def detect_language(text):
     return None
 
 
-def _language_directive(last_user_text, reasoning):
+def _language_directive(last_user_text):
     """A firm, final reminder appended to the system prompt. Small local models
     drift and code-switch, so naming the target language explicitly - and
     putting it last, where recency weights it most - keeps replies consistent."""
-    scope = (
-        "from the first word to the last, including the text inside <think>...</think>"
-        if reasoning else
-        "from the first word to the last"
-    )
     lang = detect_language(last_user_text)
     if lang:
         return (
             f"LANGUAGE: The user's latest message is written in {lang}. Write your "
-            f"entire reply in {lang} ({scope}). Do not switch or mix languages "
-            f"partway through, and do not translate the user's own words back to "
-            f"them. Keep code, direct quotes and proper names in their original form."
+            f"entire reply in {lang} (from the first word to the last). Do not "
+            f"switch or mix languages partway through, and do not translate the "
+            f"user's own words back to them. Keep code, direct quotes and proper "
+            f"names in their original form."
         )
     return (
         f"LANGUAGE: Reply in the exact same language as the user's latest message "
-        f"({scope}). Do not switch or mix languages partway through. Keep code, "
-        f"direct quotes and proper names in their original form."
+        f"(from the first word to the last). Do not switch or mix languages "
+        f"partway through. Keep code, direct quotes and proper names in their "
+        f"original form."
     )
 
 
@@ -184,7 +181,7 @@ def _summary_prompt(existing_summary, new_chunk):
     ]
 
 
-def build_context(chat_id, model_name, messages):
+def build_context(chat_id, messages):
     system_content = messages[0]["content"]
     history = messages[1:]
 
@@ -228,12 +225,9 @@ def build_context(chat_id, model_name, messages):
     else:
         recent = history
 
-    # Keep the language reminder dead last - small models weight the end of the
-    # system prompt most heavily. "deepseek" marks the reasoning distills, which
-    # are the worst offenders for thinking in one language and answering in
-    # another.
-    reasoning = "deepseek" in (model_name or "").lower()
-    system_content += "\n\n" + _language_directive(last_user_msg, reasoning)
+    # Keep the language reminder dead last - small models weight the end of
+    # the system prompt most heavily.
+    system_content += "\n\n" + _language_directive(last_user_msg)
 
     final_messages = [{"role": "system", "content": system_content}] + recent
     return final_messages, {"compressed": compressed, "doc_sources": doc_sources}
@@ -241,7 +235,7 @@ def build_context(chat_id, model_name, messages):
 
 def estimate_context(chat_id, model_name, messages):
     llm = model_manager.ensure_only_model_loaded(model_name)
-    final_messages, meta = build_context(chat_id, model_name, messages)
+    final_messages, meta = build_context(chat_id, messages)
     context_used = count_tokens(llm, final_messages)
     context_max = config.load_config().get("context_window", config.DEFAULT_CONTEXT)
     return {"context_used": context_used, "context_max": context_max, "compressed": meta["compressed"]}

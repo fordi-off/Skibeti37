@@ -72,9 +72,6 @@ def _fit_to_context(llm, messages, context_max, response_reserve):
 
     return msgs, True
 
-# Reasoning models emit a <think> block and need more room before the answer.
-# Qwen3-Thinking in particular can be long-winded inside <think>.
-REASONING_MAX_TOKENS = 4000
 DEFAULT_MAX_TOKENS = 2000
 
 CONTINUATION_PROMPT = (
@@ -88,39 +85,10 @@ CONTINUATION_PROMPT = (
 _stop_event = threading.Event()
 
 
-def _is_reasoning_model(model_name):
-    """A model whose replies contain a <think> block: the DeepSeek-R1 distills
-    and Qwen3's dedicated *-Thinking* variants."""
-    low = model_name.lower()
-    return "deepseek" in low or "-r1-" in low or "thinking" in low
-
-
 def _wants_no_think(model_name):
-    """Plain Qwen3 models are hybrid - think or answer directly - and belong
-    in the chat slot with thinking off. The single-mode 2507 variants, the
-    DeepSeek distill and non-Qwen3 models are excluded: they either can't
-    think at all or are reasoning models that should."""
-    return "qwen3" in model_name.lower() and not _is_reasoning_model(model_name)
-
-
-def _apply_thinking_tag(final_messages, model_name):
-    """Force the reasoning slot's hybrid Qwen3 models into thinking mode via
-    the standard /think tag. The chat slot's opposite case (/no_think) isn't
-    applied here - llama.cpp currently ignores Qwen3.5's enable_thinking=false
-    (ggml-org/llama.cpp #20182, #20409), so the model thinks anyway and, since
-    it isn't primed to wrap that in <think>, the raw chain-of-thought leaks
-    straight into the visible reply instead of being caught by the UI's
-    <think>-block safety net. _stream_and_report primes an empty, already-
-    closed <think></think> in the raw prompt instead, which sidesteps the
-    template bug entirely rather than depending on the broken flag."""
-    if "qwen3" not in model_name.lower() or not _is_reasoning_model(model_name):
-        return
-    tag = "/think"
-    for m in reversed(final_messages):
-        if m["role"] == "user":
-            if not m["content"].rstrip().endswith(tag):
-                m["content"] = m["content"].rstrip() + " " + tag
-            return
+    """Plain Qwen3 models are hybrid - think or answer directly - so force
+    them into the non-thinking chat mode (see _stream_and_report)."""
+    return "qwen3" in model_name.lower()
 
 
 def stop():
@@ -148,7 +116,7 @@ def _spawn(model_name, messages, chat_id, continuation):
 
 def _stream_and_report(llm, final_messages, meta, model_name):
     context_max = config.load_config().get("context_window", config.DEFAULT_CONTEXT)
-    max_tokens = REASONING_MAX_TOKENS if _is_reasoning_model(model_name) else DEFAULT_MAX_TOKENS
+    max_tokens = DEFAULT_MAX_TOKENS
 
     final_messages, trimmed = _fit_to_context(llm, final_messages, context_max, max_tokens)
     context_used = chats.count_tokens(llm, final_messages)
@@ -165,9 +133,12 @@ def _stream_and_report(llm, final_messages, meta, model_name):
 
     if not stopped:
         if _wants_no_think(model_name):
-            # Bypass create_chat_completion's template entirely for this case -
-            # see _apply_thinking_tag for why the soft /no_think signal can't
-            # be trusted to actually turn thinking off.
+            # Bypass create_chat_completion's template entirely for this case:
+            # llama.cpp currently ignores Qwen3.5's enable_thinking=false
+            # (ggml-org/llama.cpp #20182, #20409), so the model keeps thinking
+            # regardless of what the chat template says. Priming an empty,
+            # already-closed <think></think> in the raw prompt sidesteps the
+            # template bug entirely instead of depending on the broken flag.
             prompt = model_manager.render_forced_no_think_prompt(final_messages)
             stream = llm.create_completion(
                 prompt=prompt, max_tokens=max_tokens, stream=True,
@@ -227,8 +198,7 @@ def _generate(model_name, messages, chat_id=None, continuation=False):
         llm = model_manager.ensure_only_model_loaded(model_name)
         if phase == "loading":
             runtime.window.evaluate_js('onGenPhase("generating")')
-        final_messages, meta = chats.build_context(chat_id, model_name, msgs)
-        _apply_thinking_tag(final_messages, model_name)
+        final_messages, meta = chats.build_context(chat_id, msgs)
         _stream_and_report(llm, final_messages, meta, model_name)
     except Exception as e:
         applog.error(f"generation failed: {e}")

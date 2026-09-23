@@ -29,14 +29,6 @@ const SYSTEM_PROMPT =
 
 let conversation = [{ role: "system", content: SYSTEM_PROMPT }];
 
-// Reasoning models (DeepSeek-R1 distill) emit a <think> block that the UI
-// renders separately from the answer.
-function isReasoningModel(id) {
-  if (!id) return false;
-  const hay = (id + " " + (modelLabels[id] || "")).toLowerCase();
-  return hay.includes("deepseek") || hay.includes("thinking") || hay.includes("-r1-");
-}
-
 const chatEl = document.getElementById("chat");
 const modelSelectEl = document.getElementById("model-select");
 const statusEl = document.getElementById("status-line");

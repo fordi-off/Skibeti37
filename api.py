@@ -20,10 +20,6 @@ class Api:
     def model_catalog(self):
         return downloader.catalog_with_status()
 
-    def setup_status(self):
-        """{needs_setup} - true while the always-required models aren't in place."""
-        return {"needs_setup": downloader.needs_setup()}
-
     def start_model_downloads(self, ids_json):
         return downloader.start(json.loads(ids_json))
 
