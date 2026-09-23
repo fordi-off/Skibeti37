@@ -18,18 +18,20 @@ import runtime
 MODELS_DIR = config.MODELS_DIR
 CHUNK = 256 * 1024
 
-# role: embed | utility | main | reasoning
-#   embed + utility  -> always downloaded (auto)
-#   main + reasoning -> user picks a size, or skips
+# role: embed | utility | main
+#   embed + utility -> always downloaded (auto)
+#   main            -> user picks a size, or skips
 #
 # Main + utility are Qwen3.5 (2026). The plain Qwen3/3.5 models are "hybrid" -
 # they can think or answer directly; generation.py/model_manager.py force
 # thinking off for the chat slot (see complete_no_think there - llama.cpp
 # currently ignores these models' own enable_thinking=false, so the app
-# primes an already-closed <think></think> in the raw prompt instead). The
-# reasoning slot uses single-mode models (Qwen3-*-Thinking, the
-# DeepSeek-R1 distill) whose names encode "thinking"/"deepseek" so the app can
-# tell them apart. Older Qwen2.5 / DeepSeek .gguf files keep working.
+# primes an already-closed <think></think> in the raw prompt instead). A
+# dedicated single-mode thinking model (Qwen3-*-Thinking, a DeepSeek-R1
+# distill) still works if added to models/ by hand - generation.py/chat.js
+# recognize one by "thinking"/"deepseek"/"-r1-" in the filename - it's just
+# not offered by the guided installer for now. Older Qwen2.5 / DeepSeek
+# .gguf files keep working too.
 _HF = "https://huggingface.co"
 CATALOG = [
     {
@@ -87,21 +89,11 @@ CATALOG = [
         "url": f"{_HF}/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/main/Qwen_Qwen3.5-9B-Q3_K_M.gguf",
     },
 
-    # --- reasoning model (math / logic, shows its thinking): choose a size ---
-    {
-        "id": "reason-4b", "role": "reasoning", "size_label": "4B", "default": True,
-        "note": "raskest",
-        "filename": "Qwen_Qwen3-4B-Thinking-2507-Q4_K_M.gguf", "display_name": "Qwen3 4b (tenkning)",
-        "size_bytes": 2_497_280_736,
-        "url": f"{_HF}/bartowski/Qwen_Qwen3-4B-Thinking-2507-GGUF/resolve/main/Qwen_Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
-    },
-    {
-        "id": "reason-8b", "role": "reasoning", "size_label": "8B", "note": "anbefalt, sterk pa matte",
-        "filename": "deepseek-ai_DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf",
-        "display_name": "DeepSeek R1 (Qwen3 8b)",
-        "size_bytes": 5_027_783_040,
-        "url": f"{_HF}/bartowski/deepseek-ai_DeepSeek-R1-0528-Qwen3-8B-GGUF/resolve/main/deepseek-ai_DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf",
-    },
+    # No "reasoning" role for now - the dedicated thinking/DeepSeek-R1 models
+    # were dropped from the guided installer (buggy, not needed for the
+    # common case). generation.py/chat.js still detect and handle a reasoning
+    # model by filename ("thinking"/"deepseek"/"-r1-") if one is added to
+    # models/ by hand.
 ]
 
 AUTO_IDS = ["embed", "utility"]

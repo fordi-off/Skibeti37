@@ -1,6 +1,6 @@
 // ---------------- First-run model setup (inline in the chat area) ----------------
 // The embedder + Qwen 1.5B always download. The user picks a size for the
-// main and reasoning models, or skips and adds .gguf files themselves.
+// main model as a list of cards, or skips and adds .gguf files themselves.
 // Everything renders inside #chat; while a download runs the composer is
 // disabled (there's no model yet anyway).
 
@@ -25,28 +25,45 @@ function phaseLabel(p) {
   return { done: "ferdig", error: "med feil", cancelled: "avbrutt" }[p] || "";
 }
 
+// Builds one radio-per-row "card" list for a catalog role, plus a trailing
+// "Ingen" card. Selecting a row is a whole-row click, not just the tiny radio.
+function modelChoiceListHTML(role) {
+  const opts = setupCatalog.filter(e => e.role === role);
+  const rows = opts.map(e => ({
+    value: e.id,
+    checked: !!e.default,
+    disabled: !!e.installed,
+    title: `${e.display_name} <span class="model-choice-size">${e.size_label}</span>`,
+    desc: `${e.note}${e.installed ? " · installert" : " · " + fmtSize(e.size_bytes)}`,
+  }));
+  rows.push({
+    value: "", checked: !opts.some(e => e.default), disabled: false,
+    title: "Ingen", desc: "Jeg legger til en .gguf-fil selv i models/",
+  });
+
+  return rows.map(r => `
+    <label class="model-choice-item${r.checked ? " selected" : ""}${r.disabled ? " disabled" : ""}">
+      <input type="radio" name="setup-main" value="${r.value}" ${r.checked ? "checked" : ""} ${r.disabled ? "disabled" : ""}>
+      <div class="model-choice-body">
+        <div class="model-choice-title">${r.title}</div>
+        <div class="model-choice-desc">${r.desc}</div>
+      </div>
+    </label>`).join("");
+}
+
 async function renderSetupPanel() {
   if (setupBusy) return;
   setupCatalog = await window.pywebview.api.model_catalog();
-
-  const opts = (role) => setupCatalog
-    .filter(e => e.role === role)
-    .map(e => `<option value="${e.id}" ${e.default ? "selected" : ""}${e.installed ? " disabled" : ""}>${e.size_label} — ${e.note}${e.installed ? " (installert)" : " · " + fmtSize(e.size_bytes)}</option>`)
-    .join("");
 
   chatEl.innerHTML = `
     <div class="setup-panel">
       <h2>Kom i gang</h2>
       <p>Skibeti37 laster ned dokumentmodellen og en liten chatmodell (Qwen 1.5B) uansett.
-         Velg hvor store de to hovedmodellene skal være, eller hopp over og legg til egne
+         Velg størrelse på hovedmodellen, eller hopp over og legg til egne
          <code>.gguf</code>-filer i <code>models/</code>.</p>
 
-      <label>Hovedmodell (vanlig chat)
-        <select id="setup-main">${opts("main")}<option value="">Ingen — jeg legger til selv</option></select>
-      </label>
-      <label>Resonneringsmodell (matte / logikk)
-        <select id="setup-reason">${opts("reasoning")}<option value="">Ingen — jeg legger til selv</option></select>
-      </label>
+      <label>Hovedmodell (vanlig chat)</label>
+      <div class="model-choice-list" id="setup-main-list">${modelChoiceListHTML("main")}</div>
 
       <div class="setup-panel-total" id="setup-total"></div>
       <div class="setup-panel-btns">
@@ -55,10 +72,12 @@ async function renderSetupPanel() {
       </div>
     </div>`;
 
-  const mainSel = document.getElementById("setup-main");
-  const reasonSel = document.getElementById("setup-reason");
+  const listEl = document.getElementById("setup-main-list");
   const totalEl = document.getElementById("setup-total");
-  const chosen = () => [mainSel.value, reasonSel.value].filter(Boolean);
+  const chosen = () => {
+    const checked = listEl.querySelector("input:checked");
+    return checked && checked.value ? [checked.value] : [];
+  };
 
   const recalcTotal = () => {
     const ids = ["embed", "utility", ...chosen()];
@@ -68,7 +87,12 @@ async function renderSetupPanel() {
     }, 0);
     totalEl.textContent = `Å laste ned: ${fmtSize(bytes) === "0 MB" ? "ingenting nytt" : fmtSize(bytes)}`;
   };
-  [mainSel, reasonSel].forEach(s => s.addEventListener("change", recalcTotal));
+  listEl.addEventListener("change", () => {
+    listEl.querySelectorAll(".model-choice-item").forEach(item => {
+      item.classList.toggle("selected", item.querySelector("input").checked);
+    });
+    recalcTotal();
+  });
   recalcTotal();
 
   document.getElementById("setup-go").onclick = () => startSetupDownload(chosen());

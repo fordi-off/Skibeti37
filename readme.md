@@ -128,33 +128,35 @@ panel:
 - **nomic-embed-text v1.5** (document search) and **Qwen3.5 2B**
   (the background model for summaries/compression) download
   automatically — no choice.
-- **Hovedmodell** — pick a size for the normal chat model: Qwen3.5
-  **4B** (~4.5 GB RAM), **Qwen3 8B** or **NB Llama 3.1 8B** (~7 GB RAM
-  each), or **9B** (default; full Q4 ~8 GB RAM, or compact Q3 ~7 GB), or
-  "Ingen". The 9B is the sweet spot — noticeably stronger than an 8B,
-  still runs where a 14B won't; the 8B options are a middle ground when
-  even the compact 9B doesn't fit. NB Llama 3.1 8B is a National Library
-  of Norway fine-tune (the NoTraM project) aimed specifically at
-  Norwegian Bokmål/Nynorsk - worth trying since this app's replies are
-  almost always in Norwegian.
-- **Resonneringsmodell** — pick a size for matte/logikk:
-  **Qwen3 4B-Thinking** (default) or **DeepSeek-R1 (Qwen3 8B)**, or
-  "Ingen".
+- **Hovedmodell** — pick a size for the normal chat model from a list of
+  cards, each with a short description: Qwen3.5 **4B** (~4.5 GB RAM),
+  **Qwen3 8B** or **NB Llama 3.1 8B** (~7 GB RAM each), **9B** (default;
+  full Q4 ~8 GB RAM, or compact Q3 ~7 GB), or "Ingen". The 9B is the
+  sweet spot — noticeably stronger than an 8B, still runs where a 14B
+  won't; the 8B options are a middle ground when even the compact 9B
+  doesn't fit. NB Llama 3.1 8B is a National Library of Norway fine-tune
+  (the NoTraM project) aimed specifically at Norwegian Bokmål/Nynorsk -
+  worth trying since this app's replies are almost always in Norwegian.
 - **Hopp over** downloads only the two automatic files and drops you
   into the app; add your own `.gguf` files to `models/` whenever.
 
-The plain Qwen3.5 models are "hybrid" — they can reason step by step or
-answer directly. For the chat slot the app forces thinking off by priming
-an already-closed `<think></think>` in the raw prompt, rather than relying
-on the model's own `enable_thinking=false`/`/no_think` switch — llama.cpp
-currently ignores that for Qwen3.5 ([ggml-org/llama.cpp#20182](https://github.com/ggml-org/llama.cpp/issues/20182),
+There's no dedicated reasoning/"thinking" model in the guided installer -
+the DeepSeek-R1 and Qwen3-Thinking options were dropped for being buggier
+than they're worth for most use. The plain Qwen3.5 models are still
+"hybrid" — they can reason step by step or answer directly. For the chat
+slot the app forces thinking off by priming an already-closed
+`<think></think>` in the raw prompt, rather than relying on the model's own
+`enable_thinking=false`/`/no_think` switch — llama.cpp currently ignores
+that for Qwen3.5 ([ggml-org/llama.cpp#20182](https://github.com/ggml-org/llama.cpp/issues/20182),
 [#20409](https://github.com/ggml-org/llama.cpp/issues/20409)), which used to
 show up as the model rambling through a visible, unstructured "thinking"
-ramble instead of a clean answer. The reasoning slot uses dedicated
-`-Thinking` / DeepSeek-R1 models. Older Qwen2.5 / DeepSeek `.gguf` files you
-already have keep working. Bigger options exist (Qwen3.5-27B, the 35B-A3B
-MoE) but need 16–24 GB RAM — add those `.gguf` files by hand if your machine
-has the headroom.
+ramble instead of a clean answer. If you want a dedicated reasoning model
+anyway, drop a `-Thinking` / DeepSeek-R1 `.gguf` into `models/` yourself -
+the app still recognizes and handles one by filename (see "Reasoning
+models" below). Older Qwen2.5 / DeepSeek `.gguf` files you already have
+keep working. Bigger options exist (Qwen3.5-27B, the 35B-A3B MoE) but need
+16–24 GB RAM — add those `.gguf` files by hand if your machine has the
+headroom.
 
 Downloads run one at a time with a live progress bar, speed and ETA, and
 resume from where they stopped (`.part` file) if interrupted. The panel is
@@ -267,12 +269,14 @@ it recomputes the context estimate.
 
 ### Reasoning models
 
-The reasoning models (Qwen3-Thinking, DeepSeek-R1) wrap their
-chain-of-thought in `<think>...</think>`. That part is shown live in a
-collapsible **Tankegang** block that folds away once the answer is done
-— click it to read the reasoning. Only the answer is saved to the
-conversation. The block also opens if a hybrid Qwen model emits
-`<think>` even though it wasn't picked as the reasoning model.
+Not offered by the guided installer (see "Models" above), but still
+supported if you add one to `models/` yourself: a reasoning model
+(Qwen3-Thinking, DeepSeek-R1) wraps its chain-of-thought in
+`<think>...</think>`. That part is shown live in a collapsible
+**Tankegang** block that folds away once the answer is done — click it
+to read the reasoning. Only the answer is saved to the conversation.
+The block also opens if a hybrid Qwen model emits `<think>` even though
+it isn't a dedicated reasoning model.
 
 ### Speed display
 
