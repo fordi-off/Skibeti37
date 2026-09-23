@@ -197,6 +197,7 @@ def add_document(chat_id):
         final_summary = model_manager.complete_no_think(small, utility_filename, prompt, 1200, temperature=0.3)
     else:
         final_summary = partial_summaries[0] if partial_summaries else "(tomt dokument)"
+    model_manager.unload_utility_model()
 
     doc_id = str(uuid.uuid4())
     data = {"id": doc_id, "filename": filename, "summary": final_summary, "chunks": chunk_data}

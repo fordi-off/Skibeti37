@@ -98,13 +98,16 @@ def get_models_config():
 def get_utility_model_filename():
     """The model used for background tasks (document summaries, conversation
     compression): the explicitly chosen model if set, otherwise the smallest
-    active model file."""
+    model file. Deliberately ignores the "active" flag - that only controls
+    what shows up in the main chat picker, so a model (e.g. the small
+    utility one) can be hidden from chat by mistake while still doing its
+    background job."""
     cfg = load_config()
     models_cfg = get_models_config()
     forced = cfg.get("utility_model")
-    active_files = [f for f, c in models_cfg.items() if c.get("active", True)]
-    if forced and forced in active_files:
+    all_files = list(models_cfg.keys())
+    if forced and forced in all_files:
         return forced
-    if not active_files:
+    if not all_files:
         return None
-    return min(active_files, key=lambda f: os.path.getsize(os.path.join(MODELS_DIR, f)))
+    return min(all_files, key=lambda f: os.path.getsize(os.path.join(MODELS_DIR, f)))

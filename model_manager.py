@@ -1,7 +1,8 @@
-"""Loads and unloads GGUF models via llama-cpp-python. Always keeps the
-background model (get_utility_model_filename) in memory, but unloads other
-large chat models when switching, to avoid holding several 7B-class models
-in RAM at once."""
+"""Loads and unloads GGUF models via llama-cpp-python. Keeps the background
+model (get_utility_model_filename) loaded only while it's actively doing a
+summarization task (see unload_utility_model) and unloads other large chat
+models when switching, to avoid holding several 7B-class models in RAM at
+once."""
 
 import ctypes
 import gc
@@ -140,6 +141,19 @@ def unload_all_but_utility():
     if freed:
         gc.collect()
         applog.log(f"unloaded for indexing: {', '.join(freed)}")
+
+
+def unload_utility_model():
+    """Free the background model's RAM right after a summarization task -
+    unlike a chat model it isn't needed continuously, only for the brief
+    moments chats.py/documents.py call complete_no_think(). The next call to
+    get_model() reloads it (a few seconds), which is a fine trade for not
+    holding onto ~1-2 GB of RAM the rest of the time."""
+    utility = config.get_utility_model_filename()
+    if utility and utility in loaded_models:
+        del loaded_models[utility]
+        gc.collect()
+        applog.log(f"unloaded background model: {utility}")
 
 
 def remove_model(filename):

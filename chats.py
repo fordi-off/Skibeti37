@@ -214,6 +214,7 @@ def build_context(chat_id, messages):
             new_summary = model_manager.complete_no_think(
                 small, utility_filename or "", prompt, 500, temperature=0.3
             )
+            model_manager.unload_utility_model()
             chat_store.save_summary_cache(chat_id, new_summary, keep_from)
             cache = {"summary": new_summary, "summarized_count": keep_from}
 
