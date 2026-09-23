@@ -19,8 +19,9 @@ server to start manually.
 8. [How document RAG works](#how-document-rag-works)
 9. [Technical architecture](#technical-architecture)
 10. [Known limitations and troubleshooting](#known-limitations-and-troubleshooting)
-11. [Possible future improvements](#possible-future-improvements)
-12. [License](#license)
+11. [Making your own quantization](#making-your-own-quantization)
+12. [Possible future improvements](#possible-future-improvements)
+13. [License](#license)
 
 ---
 
@@ -593,6 +594,46 @@ being discovered, and that its filename matches what's on disk.
 carry over** if you're upgrading from an older version of this project
 — the storage format changed from per-chat folders to a shared library.
 Re-add anything you need.
+
+---
+
+## Making your own quantization
+
+The download catalog only offers the quants their publishers uploaded.
+If you want a size that doesn't exist yet - a more aggressive quant of
+a model that's only published as Q4_K_M, say - you can make one
+yourself and drop it straight into `models/` (anything you put there is
+auto-discovered, no catalog entry needed). This is a one-time, fairly
+heavy local process, not something the app does for you.
+
+Quantization only works GGUF → smaller GGUF, so you need the original
+full-precision weights as your starting point - you can't get a good
+Q3_K_M by re-quantizing an already-quantized Q4_K_M file; that stacks
+two lossy steps for nothing. The pipeline is: original model → f16
+GGUF → quantized GGUF.
+
+On Windows, no compiler is required:
+
+1. **Get the quantizer.** Download a `llama-*-bin-win-cpu-x64.zip` from
+   [llama.cpp's GitHub Releases](https://github.com/ggml-org/llama.cpp/releases)
+   and unzip it - this gives you `llama-quantize.exe` directly, prebuilt.
+2. **Get the converter script.**
+   `git clone --depth 1 https://github.com/ggml-org/llama.cpp` - you only
+   need its Python conversion tooling, not a C++ build.
+3. **Install its Python dependencies** (heavy - torch, transformers,
+   etc., several GB, one-time):
+   `pip install -r llama.cpp/requirements/requirements-convert_hf_to_gguf.txt`
+4. **Download the original (non-GGUF) weights**, e.g. for the Norwegian
+   model (~16 GB):
+   `huggingface-cli download NbAiLab/nb-llama-3.1-8B-Instruct --local-dir nb-llama-hf`
+5. **Convert to f16 GGUF** (~16 GB again):
+   `python llama.cpp/convert_hf_to_gguf.py nb-llama-hf --outfile nb-llama-f16.gguf --outtype f16`
+6. **Quantize down** to whatever size you need:
+   `llama-quantize.exe nb-llama-f16.gguf nb-llama-3.1-8b-instruct-Q3_K_M.gguf Q3_K_M`
+   (swap in `Q2_K` for smaller still, at more quality cost)
+7. **Move the result into `models/`** and delete the ~32 GB of
+   intermediate files (the HF checkout and the f16 GGUF) - only the
+   final quantized file needs to stick around.
 
 ---
 
