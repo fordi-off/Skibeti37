@@ -65,6 +65,16 @@ CATALOG = [
         "url": f"{_HF}/bartowski/Qwen_Qwen3-8B-GGUF/resolve/main/Qwen_Qwen3-8B-Q4_K_M.gguf",
     },
     {
+        "id": "main-8b-no", "role": "main", "size_label": "8B", "note": "norsk-tilpasset (NB), ~7 GB RAM",
+        # Llama 3.1 8B fine-tuned by the National Library of Norway (NoTraM
+        # project) specifically for Norwegian Bokmal/Nynorsk - worth trying
+        # since every reply in this app is in Norwegian. Plain Llama, not
+        # hybrid - no thinking-mode handling needed.
+        "filename": "nb-llama-3.1-8b-instruct-q4_k_m.gguf", "display_name": "NB Llama 3.1 8b (norsk)",
+        "size_bytes": 4_920_000_000,
+        "url": f"{_HF}/NbAiLab/nb-llama-3.1-8B-Instruct-Q4_K_M-GGUF/resolve/main/nb-llama-3.1-8b-instruct-q4_k_m.gguf",
+    },
+    {
         "id": "main-9b", "role": "main", "size_label": "9B", "default": True, "note": "anbefalt, ~8 GB RAM",
         "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf", "display_name": "Qwen3.5 9b",
         "size_bytes": 6_169_341_984,

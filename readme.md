@@ -129,10 +129,14 @@ panel:
   (the background model for summaries/compression) download
   automatically — no choice.
 - **Hovedmodell** — pick a size for the normal chat model: Qwen3.5
-  **4B** (~4.5 GB RAM), **Qwen3 8B** (~7 GB RAM), or **9B** (default;
-  full Q4 ~8 GB RAM, or compact Q3 ~7 GB), or "Ingen". The 9B is the
-  sweet spot — noticeably stronger than an 8B, still runs where a 14B
-  won't; the 8B is a middle ground when even the compact 9B doesn't fit.
+  **4B** (~4.5 GB RAM), **Qwen3 8B** or **NB Llama 3.1 8B** (~7 GB RAM
+  each), or **9B** (default; full Q4 ~8 GB RAM, or compact Q3 ~7 GB), or
+  "Ingen". The 9B is the sweet spot — noticeably stronger than an 8B,
+  still runs where a 14B won't; the 8B options are a middle ground when
+  even the compact 9B doesn't fit. NB Llama 3.1 8B is a National Library
+  of Norway fine-tune (the NoTraM project) aimed specifically at
+  Norwegian Bokmål/Nynorsk - worth trying since this app's replies are
+  almost always in Norwegian.
 - **Resonneringsmodell** — pick a size for matte/logikk:
   **Qwen3 4B-Thinking** (default) or **DeepSeek-R1 (Qwen3 8B)**, or
   "Ingen".
