@@ -9,6 +9,27 @@ function logStatus(msg) {
   );
 }
 
+// ---------------- Theme toggle (light/dark) ----------------
+// index.html's inline bootstrap script already set data-theme from
+// localStorage (if the user had picked one) before first paint, to avoid a
+// flash of the wrong theme. This just wires up the button to flip it.
+(function () {
+  const btn = document.getElementById("theme-toggle-btn");
+  if (!btn) return;
+
+  function currentTheme() {
+    const explicit = document.documentElement.getAttribute("data-theme");
+    if (explicit === "light" || explicit === "dark") return explicit;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  btn.addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("skibeti37-theme", next); } catch (err) { /* ignore */ }
+  });
+})();
+
 let allModels = [];          // [{id, name}]
 let modelLabels = {};        // id -> name (short display text)
 let allCommands = [];        // [{command, description, skill}] - slash commands

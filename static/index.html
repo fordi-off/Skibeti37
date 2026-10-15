@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Skibeti37</title>
+<script>
+  // Set the theme before first paint, so there's no flash of the wrong
+  // theme while the stylesheet and rest of the page load. No stored
+  // choice yet -> leave unset and let the CSS prefers-color-scheme
+  // media query follow the OS setting.
+  (function () {
+    try {
+      var saved = localStorage.getItem("skibeti37-theme");
+      if (saved === "light" || saved === "dark") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    } catch (err) { /* localStorage unavailable - system theme applies */ }
+  })();
+</script>
 <script src="marked.min.js"></script>
 <script src="highlight.min.js"></script>
 <link rel="stylesheet" href="katex/katex.min.css">
@@ -18,6 +32,10 @@
   <div class="sidebar-header">
     <h1>Skibeti37</h1>
     <span>lokal modell-lab</span>
+    <button id="theme-toggle-btn" title="Bytt mellom lyst og mørkt tema" aria-label="Bytt tema">
+      <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.5 12H2M22 12h-2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>
+      <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+    </button>
   </div>
 
   <div id="chats-section" class="sidebar-section">
