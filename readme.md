@@ -565,6 +565,24 @@ it stops with a message telling you how much is needed, instead of
 letting `llama.cpp` hard-crash the whole app. Close other programs, pick
 a smaller model, or lower the context window.
 
+**"Numpy is only used by document search, not model loading" / numpy
+breaks on some machines.** `numpy` is only ever imported for document
+RAG (ranking chunks by similarity) — `documents.py` imports it inside a
+`try/except` that also runs a tiny self-test (an array op, a norm, a
+dot product, a sort) right after importing, because a broken numpy
+install often imports fine and only fails the first time a C-extension
+submodule actually gets used. The most common cause on Windows is a
+stale/mismatched install — something on the machine still built against
+the numpy 1.x C-API while 2.x is what's actually installed, which
+raises an error that explicitly mentions "NumPy 1.x" and the C-API. If
+you hit that, `pip install --upgrade --force-reinstall numpy==2.5.2`
+(or just use a clean virtualenv) usually clears it. Either way, if the
+self-test fails for any reason, document search silently falls back to
+a pure-Python implementation of the same similarity ranking instead of
+crashing the app — plenty fast at this scale (a personal document
+library, not a search engine), so there's no real downside to not
+having numpy.
+
 **Repetition penalty and language slips.** An overly aggressive
 `frequency_penalty` was found to push Qwen models into code-switching
 to Chinese mid-reply once common words became "too expensive" to

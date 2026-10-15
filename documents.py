@@ -3,9 +3,9 @@ embeddings for search, plus a long summary), and linked to one or more
 conversations via chat_store's "attached_docs" field."""
 
 import json
+import math
 import os
 import uuid
-import numpy as np
 import webview
 
 import applog
@@ -16,6 +16,24 @@ import runtime
 
 DOCS_DIR = "./documents"
 os.makedirs(DOCS_DIR, exist_ok=True)
+
+try:
+    import numpy as np
+    # Importing cleanly isn't enough - a stale/mismatched numpy install
+    # (e.g. something on the machine still compiled against the numpy 1.x
+    # C-API, running against 2.x) typically only fails the first time a
+    # C-extension submodule actually gets used, not at import time. Exercise
+    # every numpy feature document search actually needs so a broken install
+    # gets caught here, once, instead of mid-search.
+    _probe = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    np.linalg.norm(_probe)
+    np.dot(_probe, _probe)
+    np.argsort(_probe)
+    HAVE_NUMPY = True
+except Exception as exc:
+    np = None
+    HAVE_NUMPY = False
+    applog.log(f"numpy unavailable or broken ({exc}) - document search will use the pure-Python fallback")
 
 RETRIEVAL_CHUNK_WORDS = 300
 RETRIEVAL_CHUNK_OVERLAP = 50
@@ -72,11 +90,35 @@ def chunk_text(text, chunk_size, overlap):
     return chunks
 
 
-def cosine_similarity(query_vec, matrix):
-    query_vec = np.array(query_vec, dtype=np.float32)
-    norms = np.linalg.norm(matrix, axis=1) * np.linalg.norm(query_vec)
-    norms[norms == 0] = 1e-10
-    return np.dot(matrix, query_vec) / norms
+def _top_matches(query_vec, all_vectors, k):
+    """(index, score) pairs for the k most cosine-similar vectors to
+    query_vec among all_vectors, descending by score. Uses numpy when it's
+    actually working, otherwise the pure-Python fallback below - both
+    return the same shape so callers don't need to care which ran."""
+    if HAVE_NUMPY:
+        query_arr = np.array(query_vec, dtype=np.float32)
+        matrix = np.array(all_vectors, dtype=np.float32)
+        norms = np.linalg.norm(matrix, axis=1) * np.linalg.norm(query_arr)
+        norms[norms == 0] = 1e-10
+        similarities = np.dot(matrix, query_arr) / norms
+        top = np.argsort(similarities)[::-1][:k]
+        return [(int(i), float(similarities[i])) for i in top]
+    return _top_matches_py(query_vec, all_vectors, k)
+
+
+def _top_matches_py(query_vec, all_vectors, k):
+    """Pure-Python fallback for _top_matches - no numpy needed. Plenty fast
+    at this scale (a personal document library, not a search engine): a few
+    thousand dot products finishes in a fraction of a second, nowhere near
+    the actual bottleneck (LLM generation)."""
+    q_norm = math.sqrt(sum(x * x for x in query_vec)) or 1e-10
+    scored = []
+    for i, vec in enumerate(all_vectors):
+        dot = sum(a * b for a, b in zip(vec, query_vec))
+        v_norm = math.sqrt(sum(a * a for a in vec)) or 1e-10
+        scored.append((i, dot / (v_norm * q_norm)))
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    return scored[:k]
 
 
 def list_documents(chat_id):
@@ -313,19 +355,17 @@ def document_context_for_query(chat_id, query_text):
 
     embed_model = model_manager.get_embedder()
     query_vec = embed_model.create_embedding(query_text)["data"][0]["embedding"]
-    matrix = np.array(all_vectors, dtype=np.float32)
-    similarities = cosine_similarity(query_vec, matrix)
-    top_indices = np.argsort(similarities)[::-1][:TOP_K_CHUNKS]
+    top_matches = _top_matches(query_vec, all_vectors, TOP_K_CHUNKS)
 
     excerpts = []
     sources = []
-    for idx in top_indices:
+    for idx, score in top_matches:
         text, filename = all_chunks[idx]
         excerpts.append(f"[From {filename}]\n{text}")
         sources.append({
             "filename": filename,
             "snippet": _snippet(text),
-            "score": round(float(similarities[idx]), 3),
+            "score": round(score, 3),
         })
 
     return RAG_PREFIX + "\n\n---\n\n".join(excerpts), sources
