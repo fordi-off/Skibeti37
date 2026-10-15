@@ -6,4 +6,6 @@
 # another machine behaves the same. Bump deliberately, not automatically.
 pywebview==6.2.1
 llama-cpp-python==0.3.35
+# Speeds up document search; optional - documents.py falls back to a
+# pure-Python implementation automatically if numpy is missing or broken.
 numpy==2.5.2

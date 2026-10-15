@@ -324,10 +324,10 @@ to whichever conversations need them.
   stays in the library for later use elsewhere. Deleting a document
   everywhere happens in Settings → Dokumenter
 
-After a reply that used attached documents, a collapsible **"N
-dokumentutdrag brukt i svaret"** line appears under it, listing the
-exact excerpts (filename, similarity score, and the opening words) that
-were retrieved and fed to the model for that answer.
+After a reply that used attached documents, a collapsible **"Kilder · N
+utdrag"** line appears under it, listing the exact excerpts (filename,
+similarity score, and the opening words) that were retrieved and fed
+to the model for that answer.
 
 ### Slash commands (right sidebar)
 
@@ -565,8 +565,7 @@ it stops with a message telling you how much is needed, instead of
 letting `llama.cpp` hard-crash the whole app. Close other programs, pick
 a smaller model, or lower the context window.
 
-**"Numpy is only used by document search, not model loading" / numpy
-breaks on some machines.** `numpy` is only ever imported for document
+**Numpy breaking on some machines.** `numpy` is only ever imported for document
 RAG (ranking chunks by similarity) — `documents.py` imports it inside a
 `try/except` that also runs a tiny self-test (an array op, a norm, a
 dot product, a sort) right after importing, because a broken numpy

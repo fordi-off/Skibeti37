@@ -54,19 +54,6 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
   ::-webkit-scrollbar-track { background: transparent; }
 
-  /* Corner registration ticks - the recurring drafting motif. */
-  .ticked {
-    position: relative;
-    background-image:
-      linear-gradient(var(--line-strong), var(--line-strong)), linear-gradient(var(--line-strong), var(--line-strong)),
-      linear-gradient(var(--line-strong), var(--line-strong)), linear-gradient(var(--line-strong), var(--line-strong)),
-      linear-gradient(var(--line-strong), var(--line-strong)), linear-gradient(var(--line-strong), var(--line-strong)),
-      linear-gradient(var(--line-strong), var(--line-strong)), linear-gradient(var(--line-strong), var(--line-strong));
-    background-repeat: no-repeat;
-    background-size: 11px 1px, 1px 11px, 11px 1px, 1px 11px, 11px 1px, 1px 11px, 11px 1px, 1px 11px;
-    background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
-  }
-
   /* Shared micro-label look. */
   .section-head h2,
   .cmd-group-head,

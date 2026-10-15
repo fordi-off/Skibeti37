@@ -6,7 +6,6 @@ via Skibeti37.pyw there's simply no console to see it - that's fine.
 Kept deliberately tiny: one prefixed, timestamped line per event.
 """
 
-import sys
 import time
 
 _PREFIX = "[skibeti37"

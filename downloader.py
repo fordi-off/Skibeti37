@@ -136,7 +136,7 @@ def _register_in_config(entry):
     if entry["filename"] not in models:
         models[entry["filename"]] = {
             "display_name": entry.get("display_name") or config.humanize_filename(entry["filename"]),
-            "active": True, "device": "cpu",
+            "active": True, "device": "cpu", "kv_cache": "fp16",
         }
         config.save_config(cfg)
 

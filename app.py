@@ -2,7 +2,9 @@
 Skibeti37 - local chat app with saved conversations, a document library and skills.
 
 Run with: python app.py  (or double-click Skibeti37.pyw for a windowless launch)
-Requires: pip install pywebview llama-cpp-python numpy
+Requires: pip install pywebview llama-cpp-python
+Also recommended: numpy (speeds up document search; falls back to a
+pure-Python implementation automatically if it's missing or broken)
 
 The actual logic lives in dedicated modules:
   config.py          - settings and model discovery
