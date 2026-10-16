@@ -141,33 +141,64 @@ def _register_in_config(entry):
         config.save_config(cfg)
 
 
-def _download_one(entry, on_progress):
-    if _cancel.is_set():
-        return "cancelled"
-    dest = _dest(entry)
-    if os.path.isfile(dest):
-        return "already"
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    part = dest + ".part"
-    have = os.path.getsize(part) if os.path.isfile(part) else 0
+# A custom User-Agent here was found to get throttled hard by at least one
+# corporate network's traffic shaping (fast burst, then down to a few KB/s
+# after some seconds) - the exact same URL has no such problem in a normal
+# browser tab. A browser-like User-Agent (plus the headers a browser would
+# normally send alongside it) is sent on every request below.
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    ),
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
-    # A custom User-Agent here was found to get throttled to a few KB/s by
-    # some corporate network appliances (traffic that doesn't look like a
-    # real browser gets deprioritized or rate-limited), even though the
-    # exact same URL downloads at full speed in a normal browser tab. A
-    # browser-like User-Agent (plus the headers a browser would normally
-    # send alongside it) avoids that.
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-        ),
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
-    if have:
-        headers["Range"] = f"bytes={have}-"
-    req = urllib.request.Request(entry["url"] + "?download=true", headers=headers)
+# Splitting a fresh download into several parallel Range requests instead of
+# one long-lived connection: the burst-then-throttle pattern above looks like
+# per-connection bandwidth shaping, which parallel connections (same trick
+# download managers like aria2/IDM use) route around - each connection gets
+# its own burst allowance and its own cap, so total throughput multiplies
+# roughly with the connection count instead of being stuck at one cap.
+PARALLEL_CONNECTIONS = 4
+MIN_PARALLEL_SIZE = 8 * 1024 * 1024  # not worth splitting anything smaller
+
+
+def _headers(extra=None):
+    headers = dict(_BROWSER_HEADERS)
+    if extra:
+        headers.update(extra)
+    return headers
+
+
+def _probe_total_size(url):
+    """Content-Length via HEAD; falls back to a 1-byte ranged GET for
+    servers that don't answer HEAD requests usefully."""
+    try:
+        req = urllib.request.Request(url, headers=_headers(), method="HEAD")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            length = resp.headers.get("Content-Length")
+            if length:
+                return int(length)
+    except Exception:
+        pass
+    req = urllib.request.Request(url, headers=_headers({"Range": "bytes=0-0"}))
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        content_range = resp.headers.get("Content-Range")  # "bytes 0-0/12345"
+        if content_range and "/" in content_range:
+            return int(content_range.rsplit("/", 1)[1])
+        return int(resp.headers.get("Content-Length") or 0)
+
+
+def _download_sequential(url, part, have, on_progress):
+    """One connection, resumable via Range - used to resume a partially
+    downloaded file (parallel writes don't track which byte ranges of a
+    previous run actually finished) and as the fallback when the server's
+    total size can't be determined or the file is too small to bother
+    splitting."""
+    headers = _headers({"Range": f"bytes={have}-"} if have else None)
+    req = urllib.request.Request(url, headers=headers)
 
     with urllib.request.urlopen(req, timeout=60) as resp:
         clen = int(resp.headers.get("Content-Length") or 0)
@@ -191,8 +222,113 @@ def _download_one(entry, on_progress):
                 if now - last_t >= 0.4:
                     on_progress(downloaded, total, (downloaded - last_b) / (now - last_t))
                     last_t, last_b = now, downloaded
+    return "done"
 
-    if total and os.path.getsize(part) < total * 0.999:
+
+def _download_segment(url, fd, start, end, counter, lock):
+    """Fetch bytes [start, end] (inclusive) and write them straight into fd
+    at the right offset via a positional write, so every worker can share
+    one pre-sized file without seek races."""
+    req = urllib.request.Request(url, headers=_headers({"Range": f"bytes={start}-{end}"}))
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        offset = start
+        while True:
+            if _cancel.is_set():
+                return
+            chunk = resp.read(CHUNK)
+            if not chunk:
+                break
+            os.pwrite(fd, chunk, offset)
+            offset += len(chunk)
+            with lock:
+                counter[0] += len(chunk)
+
+
+def _segment_worker(url, fd, start, end, counter, lock, errors):
+    try:
+        _download_segment(url, fd, start, end, counter, lock)
+    except Exception as exc:
+        errors.append(exc)
+
+
+def _download_parallel(url, part, total, on_progress, n_conns=PARALLEL_CONNECTIONS):
+    with open(part, "wb") as f:
+        f.truncate(total)  # pre-size so every worker's pwrite lands in its own region
+
+    bounds = []
+    seg_size = total // n_conns
+    pos = 0
+    for i in range(n_conns):
+        start = pos
+        end = total - 1 if i == n_conns - 1 else pos + seg_size - 1
+        bounds.append((start, end))
+        pos = end + 1
+
+    counter = [0]
+    lock = threading.Lock()
+    errors = []
+    # os.O_BINARY only exists on Windows, where os.open() defaults to TEXT
+    # mode otherwise - without it, writes would get \n -> \r\n translated,
+    # silently corrupting the binary GGUF data and desyncing every worker's
+    # fixed byte offsets.
+    fd = os.open(part, os.O_RDWR | getattr(os, "O_BINARY", 0))
+    try:
+        threads = [
+            threading.Thread(target=_segment_worker, args=(url, fd, start, end, counter, lock, errors), daemon=True)
+            for start, end in bounds
+        ]
+        for t in threads:
+            t.start()
+
+        last_t, last_b = time.time(), 0
+        while any(t.is_alive() for t in threads):
+            time.sleep(0.2)
+            if _cancel.is_set():
+                break
+            now = time.time()
+            if now - last_t >= 0.4:
+                with lock:
+                    downloaded = counter[0]
+                on_progress(downloaded, total, (downloaded - last_b) / (now - last_t))
+                last_t, last_b = now, downloaded
+        for t in threads:
+            t.join(timeout=5)
+    finally:
+        os.close(fd)
+
+    if _cancel.is_set():
+        return "cancelled"
+    if errors:
+        raise errors[0]
+    with lock:
+        on_progress(counter[0], total, 0.0)
+    return "done"
+
+
+def _download_one(entry, on_progress):
+    if _cancel.is_set():
+        return "cancelled"
+    dest = _dest(entry)
+    if os.path.isfile(dest):
+        return "already"
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    part = dest + ".part"
+    have = os.path.getsize(part) if os.path.isfile(part) else 0
+    url = entry["url"] + "?download=true"
+
+    if have:
+        result = _download_sequential(url, part, have, on_progress)
+    else:
+        total = _probe_total_size(url)
+        if total and total >= MIN_PARALLEL_SIZE:
+            result = _download_parallel(url, part, total, on_progress)
+        else:
+            result = _download_sequential(url, part, 0, on_progress)
+    if result != "done":
+        return result
+
+    expected = entry.get("size_bytes", 0)
+    if expected and os.path.getsize(part) < expected * 0.999:
         raise IOError("nedlastingen ble avbrutt før den var ferdig")
     os.replace(part, dest)
     return "done"
