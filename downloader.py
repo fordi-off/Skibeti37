@@ -151,7 +151,20 @@ def _download_one(entry, on_progress):
     part = dest + ".part"
     have = os.path.getsize(part) if os.path.isfile(part) else 0
 
-    headers = {"User-Agent": "Skibeti37"}
+    # A custom User-Agent here was found to get throttled to a few KB/s by
+    # some corporate network appliances (traffic that doesn't look like a
+    # real browser gets deprioritized or rate-limited), even though the
+    # exact same URL downloads at full speed in a normal browser tab. A
+    # browser-like User-Agent (plus the headers a browser would normally
+    # send alongside it) avoids that.
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        ),
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     if have:
         headers["Range"] = f"bytes={have}-"
     req = urllib.request.Request(entry["url"] + "?download=true", headers=headers)
