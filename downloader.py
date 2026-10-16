@@ -3,10 +3,21 @@ runs a sequential download queue in a background thread (resumable via HTTP
 Range), and streams progress to the frontend through window.evaluate_js.
 
 Only the standard library is used - urllib handles the HuggingFace CDN
-redirect and Range resume fine."""
+redirect and Range resume fine, EXCEPT that on at least one real machine
+Python's own (OpenSSL-based) TLS stack was found to get throttled hard by
+the network (fast burst, then a few KB/s) on a URL that downloaded at full,
+sustained speed via curl.exe and a normal browser - both of which use the
+OS's native TLS stack (SChannel on Windows) instead of Python's bundled
+one. Some corporate network security appliances rate-limit/deprioritize
+traffic with a non-native TLS fingerprint. So curl.exe is used for the
+actual transfer whenever it's available (true by default on Windows 10
+1803+ and virtually all Linux/macOS installs), with the pure-urllib path
+below kept as the fallback for machines that don't have it."""
 
 import json
 import os
+import shutil
+import subprocess
 import threading
 import time
 import urllib.request
@@ -17,6 +28,7 @@ import runtime
 
 MODELS_DIR = config.MODELS_DIR
 CHUNK = 256 * 1024
+CURL_PATH = shutil.which("curl") or shutil.which("curl.exe")
 
 # role: embed | utility | main
 #   embed + utility -> always downloaded (auto)
@@ -300,6 +312,44 @@ def _download_parallel(url, part, total, on_progress, n_conns=PARALLEL_CONNECTIO
     return "done"
 
 
+def _download_via_curl(url, part, have, total_hint, on_progress):
+    """Shell out to curl.exe for the actual transfer (see the module
+    docstring for why) - follows redirects, resumes via -C, fails loudly on
+    an HTTP error instead of silently saving an error page as the file.
+    Progress is sampled by polling the destination file's growing size
+    rather than parsing curl's own progress meter, which is meant for a
+    terminal, not a script."""
+    args = [CURL_PATH, "-L", "--fail", "--silent", "--show-error",
+            "-A", _BROWSER_HEADERS["User-Agent"], "-o", part]
+    if have:
+        args += ["-C", str(have)]
+    args.append(url)
+
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    try:
+        last_t, last_b = time.time(), have
+        while proc.poll() is None:
+            if _cancel.is_set():
+                proc.terminate()
+                return "cancelled"
+            time.sleep(0.3)
+            downloaded = os.path.getsize(part) if os.path.isfile(part) else have
+            now = time.time()
+            if now - last_t >= 0.4:
+                on_progress(downloaded, total_hint or downloaded, (downloaded - last_b) / (now - last_t))
+                last_t, last_b = now, downloaded
+    finally:
+        stderr = proc.stderr.read() if proc.stderr else ""
+
+    if _cancel.is_set():
+        return "cancelled"
+    if proc.returncode != 0:
+        raise IOError(f"curl feilet (kode {proc.returncode}): {stderr.strip()[:300] or 'ukjent feil'}")
+    downloaded = os.path.getsize(part) if os.path.isfile(part) else 0
+    on_progress(downloaded, total_hint or downloaded, 0.0)
+    return "done"
+
+
 def _download_one(entry, on_progress):
     if _cancel.is_set():
         return "cancelled"
@@ -311,7 +361,9 @@ def _download_one(entry, on_progress):
     have = os.path.getsize(part) if os.path.isfile(part) else 0
     url = entry["url"] + "?download=true"
 
-    if have:
+    if CURL_PATH:
+        result = _download_via_curl(url, part, have, entry.get("size_bytes", 0), on_progress)
+    elif have:
         result = _download_sequential(url, part, have, on_progress)
     else:
         total = _probe_total_size(url)
