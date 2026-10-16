@@ -71,24 +71,32 @@ async function newEngine() {
   return new Wllama(CONFIG_PATHS, { logger: LoggerWithoutDebug });
 }
 
+// WASM's linear memory is far more constrained than real RAM - a model
+// that loads and runs fine natively can still crash the WASM runtime with
+// std::bad_alloc mid-generation (seen in testing: a 4B model at the
+// app's normal 16384-token default context). So the fallback engine asks
+// for a lot less than the native path would, regardless of what's
+// configured in Settings: a much smaller context window, always-on
+// quantized KV cache (not just when a model's kv_cache setting says so -
+// that choice was tuned for native RAM budgets, not WASM's), and smaller
+// batch sizes, which also bound peak compute-buffer memory.
+const WASM_MAX_CTX = 4096;
+const WASM_N_BATCH = 512;
+const WASM_N_UBATCH = 256;
+
 async function loadForFilename(filename, extra) {
-  const [settings, modelRows] = await Promise.all([
-    api.get_settings_overview(),
-    api.list_all_models_settings(),
-  ]);
-  const row = modelRows.find((m) => m.filename === filename) || {};
-  const kvCache = row.kv_cache || "fp16";
+  const settings = await api.get_settings_overview();
   const params = {
-    n_ctx: settings.context_window,
+    n_ctx: Math.min(settings.context_window || WASM_MAX_CTX, WASM_MAX_CTX),
+    n_batch: WASM_N_BATCH,
+    n_ubatch: WASM_N_UBATCH,
     n_threads: Math.max(1, settings.n_threads || navigator.hardwareConcurrency || 4),
     n_gpu_layers: 0,
+    cache_type_k: "q8_0",
+    cache_type_v: "q8_0",
+    flash_attn: true,
     ...extra,
   };
-  if (kvCache === "q8_0") {
-    params.cache_type_k = "q8_0";
-    params.cache_type_v = "q8_0";
-    params.flash_attn = true;
-  }
   const engine = await newEngine();
   await engine.loadModelFromUrl("/models/" + encodeURIComponent(filename), params);
   try {
@@ -330,7 +338,7 @@ export async function generate(modelName, messages, chatId, { continuation }) {
 
     const { finalMessages: built, meta } = await buildContext(chatId, msgs);
     const settings = await api.get_settings_overview();
-    const contextMax = settings.context_window;
+    const contextMax = Math.min(settings.context_window || WASM_MAX_CTX, WASM_MAX_CTX);
     const { messages: finalMessages, trimmed } = fitToContextApprox(built, contextMax, DEFAULT_MAX_TOKENS);
     const contextUsed = estimateTokens(finalMessages);
 
@@ -402,7 +410,7 @@ export async function estimateContext(chatId, modelName, messages) {
   const settings = await api.get_settings_overview();
   return {
     context_used: estimateTokens(finalMessages),
-    context_max: settings.context_window,
+    context_max: Math.min(settings.context_window || WASM_MAX_CTX, WASM_MAX_CTX),
     compressed: meta.compressed,
   };
 }
