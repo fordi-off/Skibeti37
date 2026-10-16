@@ -8,10 +8,21 @@ import ctypes
 import gc
 import os
 import time
-from llama_cpp import Llama
 
 import applog
 import config
+
+try:
+    from llama_cpp import Llama
+    LLAMA_CPP_AVAILABLE = True
+except Exception as exc:
+    # A blocked/missing native library (e.g. Windows Application Control
+    # policies on a managed machine) must not crash this whole import chain -
+    # app.py catches the fallout and switches to the browser+WASM fallback
+    # mode instead, which never touches this module's Llama() calls.
+    Llama = None
+    LLAMA_CPP_AVAILABLE = False
+    applog.log(f"llama_cpp unavailable ({exc}) - local model loading is disabled")
 
 loaded_models = {}
 embedder = None
@@ -94,6 +105,10 @@ def _new_llama(path, n_ctx, n_threads, n_gpu_layers, kv_cache="fp16"):
 
 def get_model(filename):
     if filename not in loaded_models:
+        if not LLAMA_CPP_AVAILABLE:
+            raise RuntimeError(
+                "llama_cpp er ikke tilgjengelig - kan ikke laste modeller lokalt på denne maskinen."
+            )
         path = os.path.join(config.MODELS_DIR, filename)
         if not os.path.exists(path):
             raise FileNotFoundError(f"Model file not found: {path}")
@@ -181,6 +196,10 @@ def ensure_only_model_loaded(filename):
 def get_embedder():
     global embedder
     if embedder is None:
+        if not LLAMA_CPP_AVAILABLE:
+            raise RuntimeError(
+                "llama_cpp er ikke tilgjengelig - kan ikke bruke embedder lokalt på denne maskinen."
+            )
         if not os.path.exists(config.EMBED_MODEL_PATH):
             raise FileNotFoundError(
                 f"Embedding model not found: {config.EMBED_MODEL_PATH}. "

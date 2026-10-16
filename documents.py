@@ -322,22 +322,23 @@ def _snippet(text, words=40):
     return " ".join(parts[:words]) + ("..." if len(parts) > words else "")
 
 
-def document_context_for_query(chat_id, query_text):
-    """Returns (context_string_or_None, sources). `sources` is a list of
-    {filename, snippet, score} for the chunks actually included, so the UI
-    can show which document excerpts a reply was based on."""
-    empty = (None, [])
+def get_active_chunks(chat_id):
+    """[{text, filename, embedding}] for every chunk of every actively
+    attached document on chat_id - the raw material RAG retrieval ranks
+    against. Pulled out of document_context_for_query so the browser+WASM
+    fallback mode (which has no local embedder to rank with) can fetch the
+    already-stored chunks and embeddings, then do the ranking itself with
+    an embedding it computes client-side."""
     if not chat_id:
-        return empty
+        return []
     chat = chat_store.load_chat_raw(chat_id)
     if not chat:
-        return empty
+        return []
     attached = chat.get("attached_docs", {})
     if not attached:
-        return empty
+        return []
 
-    all_chunks = []
-    all_vectors = []
+    chunks = []
     for doc_id, active in attached.items():
         if not active:
             continue
@@ -347,12 +348,20 @@ def document_context_for_query(chat_id, query_text):
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
         for chunk in data.get("chunks", []):
-            all_chunks.append((chunk["text"], data["filename"]))
-            all_vectors.append(chunk["embedding"])
+            chunks.append({"text": chunk["text"], "filename": data["filename"], "embedding": chunk["embedding"]})
+    return chunks
 
-    if not all_chunks:
+
+def document_context_for_query(chat_id, query_text):
+    """Returns (context_string_or_None, sources). `sources` is a list of
+    {filename, snippet, score} for the chunks actually included, so the UI
+    can show which document excerpts a reply was based on."""
+    empty = (None, [])
+    chunks = get_active_chunks(chat_id)
+    if not chunks:
         return empty
 
+    all_vectors = [c["embedding"] for c in chunks]
     embed_model = model_manager.get_embedder()
     query_vec = embed_model.create_embedding(query_text)["data"][0]["embedding"]
     top_matches = _top_matches(query_vec, all_vectors, TOP_K_CHUNKS)
@@ -360,12 +369,33 @@ def document_context_for_query(chat_id, query_text):
     excerpts = []
     sources = []
     for idx, score in top_matches:
-        text, filename = all_chunks[idx]
-        excerpts.append(f"[From {filename}]\n{text}")
+        chunk = chunks[idx]
+        excerpts.append(f"[From {chunk['filename']}]\n{chunk['text']}")
         sources.append({
-            "filename": filename,
-            "snippet": _snippet(text),
+            "filename": chunk["filename"],
+            "snippet": _snippet(chunk["text"]),
             "score": round(score, 3),
         })
 
     return RAG_PREFIX + "\n\n---\n\n".join(excerpts), sources
+
+
+def save_document_from_data(chat_id, filename, summary, chunks):
+    """Storage-only counterpart to add_document(): used by the browser+WASM
+    fallback mode, which computes the embeddings and summary client-side
+    (no local embedder/utility model available) and just needs the result
+    written to disk and attached to the chat. `chunks` is already
+    [{text, embedding}], shaped exactly like add_document's chunk_data."""
+    if not chat_id:
+        return {"cancelled": True, "error": "Ingen samtale å knytte dokumentet til"}
+    doc_id = str(uuid.uuid4())
+    data = {"id": doc_id, "filename": filename, "summary": summary, "chunks": chunks}
+    with open(doc_path(doc_id), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    chat = chat_store.load_chat_raw(chat_id) or {"id": chat_id, "attached_docs": {}}
+    chat.setdefault("attached_docs", {})[doc_id] = True
+    chat_store.save_chat_raw(chat_id, chat)
+
+    applog.log(f"indexed (browser mode): {filename} -> doc {doc_id[:8]} ({len(chunks)} chunks)")
+    return {"cancelled": False, "documents": list_documents(chat_id)}

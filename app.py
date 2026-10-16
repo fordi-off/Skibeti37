@@ -34,6 +34,13 @@ import runtime
 import skills
 from api import Api
 
+# Native-library failures that mean "this machine can't run pywebview /
+# llama.cpp" - caught around webview.start() below to trigger the fallback
+# server instead of crashing. Deliberately broad: the actual exception type
+# (and whether it's an OSError, ImportError or RuntimeError) depends on which
+# native DLL got blocked and where in the pythonnet/clr_loader chain it died.
+_NATIVE_FAILURE_TYPES = (ImportError, OSError, RuntimeError)
+
 
 def _startup_census():
     """One-time summary printed to the launching terminal."""
@@ -67,7 +74,17 @@ def main():
     window.events.shown += window.maximize
     runtime.window = window
     applog.log("opening window")
-    webview.start()
+    try:
+        webview.start()
+    except _NATIVE_FAILURE_TYPES as exc:
+        # Usually a blocked native DLL (pythonnet/clr_loader, Windows
+        # Application Control policies on a managed machine, missing
+        # WebView2 runtime, ...). Fall back to a pure-stdlib HTTP server and
+        # the browser-based WASM engine instead of crashing outright.
+        applog.error(f"pywebview failed to start ({exc}) - falling back to browser mode")
+        import fallback_server
+        fallback_server.run()
+        return
     applog.log("window closed - exiting")
 
 

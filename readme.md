@@ -546,6 +546,36 @@ calls triggered later work regardless of file order.
 All chat, document, and skill data is stored as plain JSON/text files
 on disk — no database, no hidden binary formats.
 
+### Fallback mode (browser + WebAssembly)
+
+Some managed/corporate Windows machines run Application Control
+policies (WDAC) that block every third-party compiled native library a
+`pip install` brings in — not just `llama-cpp-python`, but `numpy` and
+even `pythonnet`/`cffi` (which pywebview's Windows backend needs to host
+the WebView2 control). On a machine like that, `pywebview` itself can't
+start at all, regardless of which inference engine the app uses.
+
+`app.py` tries the normal path first. If `webview.start()` fails (an
+`ImportError`/`OSError`/`RuntimeError` from a blocked DLL), it falls back
+to `fallback_server.py`: a pure-standard-library HTTP server (no pip
+packages, nothing native) that serves the exact same frontend to your
+regular browser instead of an embedded window. Model inference, RAG
+embeddings and document indexing then run as WebAssembly *inside that
+browser tab* via [wllama](https://github.com/ngxson/wllama) (vendored at
+`static/wllama/`, no native DLL involved at all) — see
+`static/js/wasm-engine.js`. `static/js/bridge.js` builds a drop-in
+`window.pywebview.api` with the exact same method names the real
+pywebview bridge provides, so every other frontend file runs completely
+unchanged in either mode.
+
+Known differences in fallback mode: conversation history past the most
+recent 10 messages is simply dropped instead of being folded into a
+rolling summary (no utility-model-driven compression), the context
+meter uses an approximate word-based token count (wllama doesn't expose
+a public tokenizer), and the GPU toggle in Settings is ignored (CPU-only
+WASM). Everything else — chat, documents/RAG, skills, settings,
+model downloads — works the same.
+
 ---
 
 ## Known limitations and troubleshooting
@@ -611,6 +641,19 @@ being discovered, and that its filename matches what's on disk.
 carry over** if you're upgrading from an older version of this project
 — the storage format changed from per-chat folders to a shared library.
 Re-add anything you need.
+
+**"An Application Control policy has blocked this file" / pywebview
+won't start.** This is Windows Application Control (WDAC), not a bug in
+this app — a managed/corporate PC's IT policy is blocking a native DLL
+from loading (`llama.dll`, `numpy`'s C-extension, or `pythonnet`'s,
+depending on which one it catches first). No `pip install`/reinstall
+fixes this; it's an OS-level policy decision. The app detects this
+automatically and switches to the browser+WebAssembly fallback mode
+(see "Fallback mode" above) — your regular browser opens instead of an
+app window, and everything still works, just with WASM doing the
+inference instead of native `llama.cpp`. If you'd rather use the native
+path (faster), ask IT to allowlist the relevant file, or run the app on
+a personal, non-managed machine instead.
 
 ---
 

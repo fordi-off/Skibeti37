@@ -157,6 +157,17 @@ class Api:
     def preview_document(self, doc_id):
         return documents.preview_document(doc_id)
 
+    def doc_chunks_for_query(self, chat_id):
+        """Used only by the browser+WASM fallback mode: raw stored chunks +
+        embeddings for a chat's active documents, so it can rank them
+        against a query embedding it computes itself (see documents.get_active_chunks)."""
+        return documents.get_active_chunks(chat_id)
+
+    def save_document_from_data(self, chat_id, filename, summary, chunks_json):
+        """Used only by the browser+WASM fallback mode, after it has chunked,
+        embedded and summarized a document client-side (see documents.save_document_from_data)."""
+        return documents.save_document_from_data(chat_id, filename, summary, json.loads(chunks_json))
+
     # ---------------- Skills / slash commands ----------------
 
     def list_commands(self):
@@ -175,6 +186,12 @@ class Api:
 
     def delete_skill(self, skill_id):
         return skills.delete_skill(skill_id)
+
+    def command_bodies(self, command_names_json):
+        """Used only by the browser+WASM fallback mode, which builds the
+        system prompt client-side but still reads skill command bodies from
+        here - skills are plain text files, nothing native involved."""
+        return skills.command_bodies(json.loads(command_names_json))
 
     # ---------------- Context and generation ----------------
 
