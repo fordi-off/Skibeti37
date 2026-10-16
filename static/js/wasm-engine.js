@@ -334,9 +334,20 @@ export async function generate(modelName, messages, chatId, { continuation }) {
     const wasLoaded = chatEngineFilename === modelName;
     onGenPhase(wasLoaded ? "generating" : "loading");
     const engine = await ensureChatModel(modelName);
-    if (!wasLoaded) onGenPhase("generating");
 
+    // buildContext() may need to load the embedder (another model, from
+    // scratch the first time) and run RAG retrieval before generation can
+    // even start - without this, the UI already says "generating" while
+    // silently doing that work, which looks identical to the model itself
+    // being stuck.
+    const chunksToSearch = await api.doc_chunks_for_query(chatId);
+    if (chunksToSearch && chunksToSearch.length && !embedEngine) {
+      onGenPhase("loading");
+    } else if (!wasLoaded) {
+      onGenPhase("generating");
+    }
     const { finalMessages: built, meta } = await buildContext(chatId, msgs);
+    onGenPhase("generating");
     const settings = await api.get_settings_overview();
     const contextMax = Math.min(settings.context_window || WASM_MAX_CTX, WASM_MAX_CTX);
     const { messages: finalMessages, trimmed } = fitToContextApprox(built, contextMax, DEFAULT_MAX_TOKENS);
@@ -359,27 +370,43 @@ export async function generate(modelName, messages, chatId, { continuation }) {
         }
       };
 
+      // timings_per_token asks wllama/llama.cpp for its own prompt-eval vs
+      // decode breakdown (ResultTimings), logged below whenever a chunk
+      // carries it - needed to tell apart a slow prefill (long prompt, or
+      // too many small batches) from a slow per-token decode rate, which
+      // look identical from the outside (silence, then a late first token).
+      const logTimings = (t) => {
+        if (!t) return;
+        console.log(
+          `[skibeti37 wasm] prompt: ${t.prompt_n} tok in ${t.prompt_ms.toFixed(0)}ms ` +
+          `(${t.prompt_per_second.toFixed(1)} tok/s) | predicted: ${t.predicted_n} tok in ` +
+          `${t.predicted_ms.toFixed(0)}ms (${t.predicted_per_second.toFixed(1)} tok/s)`
+        );
+      };
+
       try {
         if (noThink) {
           const prompt = renderForcedNoThinkPrompt(finalMessages);
           await engine.createCompletion({
             prompt, max_tokens: DEFAULT_MAX_TOKENS, stream: true,
             stop: ["<|im_end|>", "<|im_start|>"], abortSignal: currentAbort.signal,
-            ...SAMPLING_PARAMS,
+            timings_per_token: true, ...SAMPLING_PARAMS,
             onData: (chunk) => {
               const choice = chunk.choices[0];
               onDelta(choice.text || "");
               if (choice.finish_reason) finishReason = choice.finish_reason;
+              logTimings(chunk.timings);
             },
           });
         } else {
           await engine.createChatCompletion({
             messages: finalMessages, max_tokens: DEFAULT_MAX_TOKENS, stream: true,
-            abortSignal: currentAbort.signal, ...SAMPLING_PARAMS,
+            abortSignal: currentAbort.signal, timings_per_token: true, ...SAMPLING_PARAMS,
             onData: (chunk) => {
               const choice = chunk.choices[0];
               onDelta((choice.delta && choice.delta.content) || "");
               if (choice.finish_reason) finishReason = choice.finish_reason;
+              logTimings(chunk.timings);
             },
           });
         }
