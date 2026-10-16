@@ -71,7 +71,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_file(self, path):
+    def _send_file(self, path, head_only=False):
         if not os.path.isfile(path):
             self.send_error(404)
             return
@@ -103,6 +103,9 @@ class Handler(BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.end_headers()
 
+        if head_only:
+            return  # HEAD: headers (size, Accept-Ranges) only, no body
+
         with open(path, "rb") as f:
             f.seek(start)
             remaining = length
@@ -116,20 +119,23 @@ class Handler(BaseHTTPRequestHandler):
                     break
                 remaining -= len(chunk)
 
-    # ---------- routing ----------
-
-    def do_GET(self):
+    def _route_get(self, head_only=False):
+        """Shared by do_GET and do_HEAD - wllama probes a model file with a
+        HEAD request before fetching it (to learn its size upfront), and the
+        default BaseHTTPRequestHandler returns 501 Unsupported for any
+        method without its own do_* handler."""
         path = self.path.split("?", 1)[0]
         if path == "/":
             path = "/index.html"
 
         if path == "/api/download_events":
-            self._stream_download_events()
+            if not head_only:
+                self._stream_download_events()
             return
 
         if path.startswith("/models/"):
             fname = os.path.basename(path[len("/models/"):])
-            self._send_file(os.path.join(config.MODELS_DIR, fname))
+            self._send_file(os.path.join(config.MODELS_DIR, fname), head_only=head_only)
             return
 
         safe_path = os.path.normpath(path).lstrip("/\\")
@@ -137,7 +143,15 @@ class Handler(BaseHTTPRequestHandler):
         if not os.path.abspath(full_path).startswith(os.path.abspath(STATIC_DIR)):
             self.send_error(403)
             return
-        self._send_file(full_path)
+        self._send_file(full_path, head_only=head_only)
+
+    # ---------- routing ----------
+
+    def do_GET(self):
+        self._route_get(head_only=False)
+
+    def do_HEAD(self):
+        self._route_get(head_only=True)
 
     def _stream_download_events(self):
         """Server-Sent Events stream of downloader.state(), pushed to the

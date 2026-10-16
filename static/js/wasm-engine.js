@@ -91,6 +91,13 @@ async function loadForFilename(filename, extra) {
   }
   const engine = await newEngine();
   await engine.loadModelFromUrl("/models/" + encodeURIComponent(filename), params);
+  try {
+    console.log(
+      `[skibeti37 wasm] ${filename}: requested n_threads=${params.n_threads}, ` +
+      `isMultithread=${engine.isMultithread()}, getNumThreads=${engine.getNumThreads()}, ` +
+      `crossOriginIsolated=${window.crossOriginIsolated}`
+    );
+  } catch (err) { /* diagnostic only */ }
   return engine;
 }
 
