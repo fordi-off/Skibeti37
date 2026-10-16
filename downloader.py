@@ -225,35 +225,38 @@ def _download_sequential(url, part, have, on_progress):
     return "done"
 
 
-def _download_segment(url, fd, start, end, counter, lock):
-    """Fetch bytes [start, end] (inclusive) and write them straight into fd
-    at the right offset via a positional write, so every worker can share
-    one pre-sized file without seek races."""
+def _download_segment(url, part, start, end, counter, lock):
+    """Fetch bytes [start, end] (inclusive) and write them straight into the
+    destination file at the right offset. Each worker opens its OWN handle to
+    the shared,
+    pre-sized destination file rather than sharing one file object/descriptor
+    across threads: a file position is per-handle, so independent handles
+    seeking and writing to disjoint byte ranges can't race each other, with
+    no need for os.pwrite (POSIX-only - not available on Windows at all)."""
     req = urllib.request.Request(url, headers=_headers({"Range": f"bytes={start}-{end}"}))
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        offset = start
+    with urllib.request.urlopen(req, timeout=60) as resp, open(part, "r+b") as f:
+        f.seek(start)
         while True:
             if _cancel.is_set():
                 return
             chunk = resp.read(CHUNK)
             if not chunk:
                 break
-            os.pwrite(fd, chunk, offset)
-            offset += len(chunk)
+            f.write(chunk)
             with lock:
                 counter[0] += len(chunk)
 
 
-def _segment_worker(url, fd, start, end, counter, lock, errors):
+def _segment_worker(url, part, start, end, counter, lock, errors):
     try:
-        _download_segment(url, fd, start, end, counter, lock)
+        _download_segment(url, part, start, end, counter, lock)
     except Exception as exc:
         errors.append(exc)
 
 
 def _download_parallel(url, part, total, on_progress, n_conns=PARALLEL_CONNECTIONS):
     with open(part, "wb") as f:
-        f.truncate(total)  # pre-size so every worker's pwrite lands in its own region
+        f.truncate(total)  # pre-size so every worker's own handle can seek+write its own region
 
     bounds = []
     seg_size = total // n_conns
@@ -267,34 +270,26 @@ def _download_parallel(url, part, total, on_progress, n_conns=PARALLEL_CONNECTIO
     counter = [0]
     lock = threading.Lock()
     errors = []
-    # os.O_BINARY only exists on Windows, where os.open() defaults to TEXT
-    # mode otherwise - without it, writes would get \n -> \r\n translated,
-    # silently corrupting the binary GGUF data and desyncing every worker's
-    # fixed byte offsets.
-    fd = os.open(part, os.O_RDWR | getattr(os, "O_BINARY", 0))
-    try:
-        threads = [
-            threading.Thread(target=_segment_worker, args=(url, fd, start, end, counter, lock, errors), daemon=True)
-            for start, end in bounds
-        ]
-        for t in threads:
-            t.start()
+    threads = [
+        threading.Thread(target=_segment_worker, args=(url, part, start, end, counter, lock, errors), daemon=True)
+        for start, end in bounds
+    ]
+    for t in threads:
+        t.start()
 
-        last_t, last_b = time.time(), 0
-        while any(t.is_alive() for t in threads):
-            time.sleep(0.2)
-            if _cancel.is_set():
-                break
-            now = time.time()
-            if now - last_t >= 0.4:
-                with lock:
-                    downloaded = counter[0]
-                on_progress(downloaded, total, (downloaded - last_b) / (now - last_t))
-                last_t, last_b = now, downloaded
-        for t in threads:
-            t.join(timeout=5)
-    finally:
-        os.close(fd)
+    last_t, last_b = time.time(), 0
+    while any(t.is_alive() for t in threads):
+        time.sleep(0.2)
+        if _cancel.is_set():
+            break
+        now = time.time()
+        if now - last_t >= 0.4:
+            with lock:
+                downloaded = counter[0]
+            on_progress(downloaded, total, (downloaded - last_b) / (now - last_t))
+            last_t, last_b = now, downloaded
+    for t in threads:
+        t.join(timeout=5)
 
     if _cancel.is_set():
         return "cancelled"
