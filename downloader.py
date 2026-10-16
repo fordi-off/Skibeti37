@@ -231,7 +231,7 @@ def _download_sequential(url, part, have, on_progress):
                 f.write(chunk)
                 downloaded += len(chunk)
                 now = time.time()
-                if now - last_t >= 0.4:
+                if now - last_t >= 0.2:
                     on_progress(downloaded, total, (downloaded - last_b) / (now - last_t))
                     last_t, last_b = now, downloaded
     return "done"
@@ -295,7 +295,7 @@ def _download_parallel(url, part, total, on_progress, n_conns=PARALLEL_CONNECTIO
         if _cancel.is_set():
             break
         now = time.time()
-        if now - last_t >= 0.4:
+        if now - last_t >= 0.2:
             with lock:
                 downloaded = counter[0]
             on_progress(downloaded, total, (downloaded - last_b) / (now - last_t))
@@ -332,10 +332,10 @@ def _download_via_curl(url, part, have, total_hint, on_progress):
             if _cancel.is_set():
                 proc.terminate()
                 return "cancelled"
-            time.sleep(0.3)
+            time.sleep(0.15)
             downloaded = os.path.getsize(part) if os.path.isfile(part) else have
             now = time.time()
-            if now - last_t >= 0.4:
+            if now - last_t >= 0.2:
                 on_progress(downloaded, total_hint or downloaded, (downloaded - last_b) / (now - last_t))
                 last_t, last_b = now, downloaded
     finally:

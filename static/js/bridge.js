@@ -75,7 +75,7 @@
         window.onDownloadState(state);
       }
     } catch (err) { /* ignore - next tick tries again */ }
-  }, 700);
+  }, 250);
 
   window.addEventListener("DOMContentLoaded", () => {
     try { logStatus("running in browser-compatibility mode (pywebview/llama.cpp unavailable on this machine)"); }
