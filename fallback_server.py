@@ -17,11 +17,13 @@ import mimetypes
 import os
 import socket
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import applog
 import config
+import downloader
 from api import Api
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -121,6 +123,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             path = "/index.html"
 
+        if path == "/api/download_events":
+            self._stream_download_events()
+            return
+
         if path.startswith("/models/"):
             fname = os.path.basename(path[len("/models/"):])
             self._send_file(os.path.join(config.MODELS_DIR, fname))
@@ -132,6 +138,30 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         self._send_file(full_path)
+
+    def _stream_download_events(self):
+        """Server-Sent Events stream of downloader.state(), pushed to the
+        page as it changes. Replaces a setInterval-based poll in bridge.js,
+        which some browsers throttle hard (to once every several seconds or
+        worse) once the tab isn't the foreground one - an open SSE
+        connection keeps delivering promptly regardless, since it's driven
+        by the network layer arriving, not a JS timer firing."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self._send_cors_headers()
+        self.end_headers()
+        last_sent = None
+        try:
+            while True:
+                payload = json.dumps(downloader.state())
+                if payload != last_sent:
+                    self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                    last_sent = payload
+                time.sleep(0.15)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError):
+            pass  # the tab closed or navigated away - just stop this stream
 
     def do_POST(self):
         if not self.path.startswith("/api/"):
@@ -169,6 +199,7 @@ def _open_browser(url):
 def run():
     port = _find_free_port()
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server.daemon_threads = True  # long-lived SSE connections shouldn't block shutdown
     url = f"http://127.0.0.1:{port}/"
     applog.log(f"fallback mode: serving {url} (pywebview/llama.cpp unavailable on this machine)")
     applog.log("inference, embeddings and document search now run as WebAssembly inside your browser tab")

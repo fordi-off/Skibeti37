@@ -65,17 +65,23 @@
   window.pywebview = { api };
 
   // The real pywebview pushes download progress into onDownloadState() via
-  // window.evaluate_js; there's no such push channel to a plain browser tab,
-  // so poll instead while a download is actually running. setup.js itself
-  // needs no changes - onDownloadState is already a plain global function.
-  setInterval(async () => {
-    try {
-      const state = await api.download_state();
+  // window.evaluate_js; there's no such push channel to a plain browser tab.
+  // A setInterval-based poll was tried first, but browsers throttle
+  // background-tab timers hard (down to once every several+ seconds, or
+  // much worse, once the tab isn't the foreground one) - so this uses
+  // Server-Sent Events instead: an open network connection the server
+  // pushes updates through, which isn't subject to that same JS-timer
+  // throttling. setup.js itself needs no changes - onDownloadState is
+  // already a plain global function.
+  try {
+    const downloadEvents = new EventSource("/api/download_events");
+    downloadEvents.onmessage = (e) => {
+      const state = JSON.parse(e.data);
       if (state && state.phase === "running" && typeof window.onDownloadState === "function") {
         window.onDownloadState(state);
       }
-    } catch (err) { /* ignore - next tick tries again */ }
-  }, 250);
+    };
+  } catch (err) { /* EventSource unsupported - extremely unlikely in a modern browser */ }
 
   window.addEventListener("DOMContentLoaded", () => {
     try { logStatus("running in browser-compatibility mode (pywebview/llama.cpp unavailable on this machine)"); }
