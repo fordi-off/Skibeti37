@@ -44,21 +44,22 @@ server to start manually.
 
 ```
 your-folder/
-│   api.py                  ← the Api class exposed to JavaScript
-│   app.py                  ← entry point (defines main())
-│   Skibeti37.pyw            ← double-click launcher, windowless (calls app.main)
-│   config.py                ← settings, model file discovery
-│   config.json               ← your saved settings (git-ignored, auto-created from defaults)
-│   chats.py                  ← chat CRUD, context building, compression
-│   chat_store.py             ← raw chat file read/write
-│   documents.py              ← document library and RAG search
-│   generation.py             ← streaming chat completion
-│   model_manager.py          ← loading/unloading GGUF models
-│   downloader.py             ← model catalog + download queue
-│   runtime.py                ← shared window reference
-│   skills.py                  ← file-based skills / slash commands
+│   api.py                    ← Python API exposed to the frontend
+│   app.py                    ← entry point; starts the native app or fallback
+│   Skibeti37.pyw              ← double-click, windowless launcher
+│   applog.py                  ← lightweight application logging
+│   config.py                  ← settings and model-file discovery
+│   chat_store.py              ← JSON file storage shared by chats and documents
+│   chats.py                   ← conversation CRUD, context and compression
+│   documents.py               ← document library, embeddings and RAG search
+│   generation.py              ← native streaming generation
+│   model_manager.py            ← native GGUF model loading/unloading
+│   downloader.py               ← model catalog, parallel/resumable downloads
+│   fallback_server.py          ← standard-library HTTP server for browser mode
+│   runtime.py                  ← shared window reference
+│   skills.py                   ← file-based skills and slash commands
 │   requirements.txt
-│   README.md
+│   readme.md
 │
 ├───chats/                   ← created automatically - one .json file per conversation
 │   └───_context_summaries/    ← rolling-summary cache for long conversations
@@ -159,11 +160,16 @@ fine as plain chat models. Bigger options exist (Qwen3.5-27B, the
 35B-A3B MoE) but need 16–24 GB RAM — add those `.gguf` files by hand if
 your machine has the headroom.
 
-Downloads run one at a time with a live progress bar, speed and ETA, and
-resume from where they stopped (`.part` file) if interrupted, and keep
-running even if you close the Settings modal - reopen it and the
-checklist resyncs to whatever's still in progress. The catalog (URLs,
-sizes, quants) lives in `downloader.py`.
+Downloads are queued and processed one at a time, with a live progress
+bar, transfer speed and ETA. Interrupted downloads resume from their
+partial `.part` file where the server supports byte ranges, and continue
+even if you close Settings; reopen it to see the current state. On
+Windows, the downloader uses `curl.exe` for reliable model-host
+transfers and parallel range connections where supported. Progress is
+streamed to browser mode through Server-Sent Events (SSE), rather than
+relying on foreground-tab JavaScript timers, which browsers can throttle
+in background tabs. The catalog (URLs, sizes and quantizations) lives in
+`downloader.py`.
 
 Everything lands as a single-file GGUF in `models/` and is still
 **discovered automatically** — anything you drop in yourself shows up too.
@@ -569,12 +575,32 @@ pywebview bridge provides, so every other frontend file runs completely
 unchanged in either mode.
 
 Known differences in fallback mode: conversation history past the most
-recent 10 messages is simply dropped instead of being folded into a
-rolling summary (no utility-model-driven compression), the context
-meter uses an approximate word-based token count (wllama doesn't expose
-a public tokenizer), and the GPU toggle in Settings is ignored (CPU-only
-WASM). Everything else — chat, documents/RAG, skills, settings,
-model downloads — works the same.
+recent 10 messages is dropped instead of being folded into a rolling
+summary (there is no utility-model-driven compression), the context
+meter uses an approximate word-based token count (wllama does not expose
+a public tokenizer), and the GPU toggle in Settings is ignored (WASM
+inference is CPU-only). Everything else — chat, documents/RAG, skills,
+settings and model downloads — is intended to work the same.
+
+**WASM memory and context limits.** Browser/WebAssembly memory is more
+constrained than native system RAM. To reduce out-of-memory crashes,
+fallback mode caps the model context at 4,096 tokens, uses a quantized
+KV cache, and uses smaller batch sizes. The context-fitting logic and
+context meter use that same cap. A model that loads successfully in
+native mode can still be too large for browser mode, depending on the
+browser and available memory.
+
+**Diagnosing slow first-token responses.** The app logs prompt-evaluation
+(prefill) and token-generation (decode) timing separately when the
+engine reports those measurements. Before text starts appearing, context
+preparation may also load the embedding model and retrieve relevant
+document chunks; the UI now reports this preparation phase instead of
+leaving the status apparently idle. These timings help distinguish slow
+prompt processing from slow token generation or document preparation
+before changing performance settings. In browser mode, check the
+browser developer console for the WASM engine's thread-count diagnostic
+after a model loads; the requested thread count and actual engine thread
+support can differ.
 
 ---
 
@@ -589,11 +615,30 @@ default; the GPU toggle in Settings is there if your hardware differs.
 laptop CPU can lower its clock speed to avoid overheating. Speed can
 vary noticeably depending on how long the machine has been working.
 
-**Not enough RAM.** Before loading a model the app checks free physical
-RAM against the file size (Windows only). If there clearly isn't enough
-it stops with a message telling you how much is needed, instead of
-letting `llama.cpp` hard-crash the whole app. Close other programs, pick
-a smaller model, or lower the context window.
+**The model loads, then nothing appears for a while.** Loading the GGUF
+file is only one part of the first response. The app may need to build
+the prompt, load the document embedder and retrieve relevant chunks
+before token generation starts. Check the application log and, in
+browser/WASM mode, the browser developer console. Recent builds report
+prefill and decode timing separately where the engine exposes it, and
+show a preparation status while document retrieval is running. A long
+prefill and a low decode speed have different causes, so compare those
+measurements before changing settings.
+
+**Browser-mode model downloads appear stuck in a background tab.**
+Progress updates use a Server-Sent Events connection because browsers
+can heavily throttle JavaScript timers in background tabs. Reopen
+Settings to refresh the visible model checklist; the download itself
+can continue after the modal is closed. On Windows, model transfers use
+`curl.exe` and parallel range requests when supported by the host.
+
+**Not enough RAM / browser memory.** Native mode checks free physical
+RAM against the model file size on Windows before loading. Browser/WASM
+mode has a separate, tighter memory budget and caps context at 4,096
+tokens with a quantized KV cache and smaller batches. If generation
+fails with an out-of-memory error or `std::bad_alloc`, try a smaller
+model, close other memory-heavy tabs/programs, or use native mode on a
+machine where the required native libraries are allowed.
 
 **Numpy breaking on some machines.** `numpy` is only ever imported for document
 RAG (ranking chunks by similarity) — `documents.py` imports it inside a
